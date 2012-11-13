@@ -1149,6 +1149,7 @@
       }
       progress_handler(this.SYNC_NETWORK);
       return oauth.rest(app, schema_uri, null, function(err, schema) {
+        log('After schema', err, schema);
         if (err) return finish_sync(err);
         if (_this.channel && schema._channel) {
           _this.channel.on_channel(schema._channel);

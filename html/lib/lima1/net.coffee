@@ -1,21 +1,20 @@
 class NetTransport
 
 	constructor: (@uri) ->
-	
-	request: (config, handler) -> 
+
+	request: (config, handler) ->
 		handler 'Not implemented'
 
 class jQueryTransport extends NetTransport
 
-	request: (config, handler) -> 
-		# log 'Doing request', @uri, config?.uri, config?.type
+	request: (config, handler) ->
+		# log 'Doing request', @uri, config?.uri, config?.type, config?.data
 		$.ajax({
+			type: (config?.type) ? 'GET'
 			url: @uri+config?.uri
-			type: config?.type ? 'GET'
-			data: config?.data ? null
-			contentType: config?.contentType ? undefined
+			data: (config?.data) ? null
+			contentType: (config?.contentType) ? undefined
 			error: (err, status, text) =>
-				log 'jQuery error:', err, status, text
 				message = text or 'HTTP error'
 				statusNo = 500
 				if err and err.status
@@ -25,6 +24,7 @@ class jQueryTransport extends NetTransport
 					try
 						data = JSON.parse err.responseText
 					catch e
+				log 'jQuery error:', err, status, text, statusNo
 				handler {status: statusNo, message: message}, data
 			success: (data) =>
 				if not data then return handler 'No data'
@@ -40,7 +40,7 @@ class OAuthProvider
 		@tokenURL = @config?.tokenURL ? '/token'
 		@clientID = @config?.clientID ? 'no_client_id'
 		@token = @config?.token
-	
+
 	getFullURL: (app, path) ->
 		return @transport.uri+"#{path}app=#{app}&oauth_token=#{@token}"
 
@@ -54,7 +54,7 @@ class OAuthProvider
 			# log 'Rest response:', error, data
 			if error
 				if error.status is 401
-					@on_token_error null 
+					@on_token_error null
 				return handler error.message
 			handler null, data
 

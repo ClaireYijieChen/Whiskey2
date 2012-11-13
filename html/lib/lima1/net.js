@@ -29,13 +29,12 @@
       var _ref, _ref2, _ref3,
         _this = this;
       return $.ajax({
+        type: (_ref = (config != null ? config.type : void 0)) != null ? _ref : 'GET',
         url: this.uri + (config != null ? config.uri : void 0),
-        type: (_ref = config != null ? config.type : void 0) != null ? _ref : 'GET',
-        data: (_ref2 = config != null ? config.data : void 0) != null ? _ref2 : null,
-        contentType: (_ref3 = config != null ? config.contentType : void 0) != null ? _ref3 : void 0,
+        data: (_ref2 = (config != null ? config.data : void 0)) != null ? _ref2 : null,
+        contentType: (_ref3 = (config != null ? config.contentType : void 0)) != null ? _ref3 : void 0,
         error: function(err, status, text) {
           var data, message, statusNo;
-          log('jQuery error:', err, status, text);
           message = text || 'HTTP error';
           statusNo = 500;
           if (err && err.status) statusNo = err.status;
@@ -47,6 +46,7 @@
 
             }
           }
+          log('jQuery error:', err, status, text, statusNo);
           return handler({
             status: statusNo,
             message: message

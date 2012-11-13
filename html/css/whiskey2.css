@@ -3,8 +3,122 @@
     right: 1em;
     bottom: 1em;
     width: 400px;
+    z-index: 2000;
+}
+
+#main-tabs-content {
+    overflow: inherit;
+}
+
+.root {
+    position: absolute;
+    top: 60px;
+    left: 0;
+    right: 0;
+    bottom: 0;
 }
 
 .clear {
     clear: both;
+}
+
+.notepad-root {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  top: 120px;
+  bottom: 0;
+}
+
+.notepad-sheets {
+  position: absolute;
+  width: 230px;
+  overflow-x: hidden;
+  overflow-y: visible;
+  top: 0;
+  bottom: 0;
+  left: 0;
+}
+
+.notepad-content {
+  left: 250px;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  position: absolute;
+  white-space: nowrap;
+  overflow: auto;
+  text-align: center;
+}
+
+.notepad-sheet-miniature {
+  box-sizing: border-box;
+  width: 200px;
+  height: 50px;
+  border: 1px solid #dddddd;
+  background-color: #ffffff;
+  left: -180px;
+  position: absolute;
+}
+
+.notepad-sheet-miniature-title {
+  margin-left: 25px;
+  width: 160px;
+  white-space: nowrap;
+  overflow: hidden;
+  visibility: hidden;
+}
+
+.notepad-sheet-miniature-hover {
+  left: 0px;
+  border-color: #888888;
+  box-shadow: 1px 1px 2px #888888;
+  cursor: pointer;
+}
+
+.notepad-sheet-miniature-hover .notepad-sheet-miniature-title {
+  visibility: visible;
+}
+
+.sheet {
+  display: inline-block;
+  border: 1px solid #aaaaaa;
+  box-shadow: 0 0 2px #888888;
+  margin: 2em;
+  overflow: visible;
+  position: relative;
+}
+
+.sheet_content {
+  position: relative;
+  border-bottom: 1px dashed #aaaaaa;
+}
+
+.sheet_title {
+  position: absolute;
+  left: 0.5em;
+  top: 0.5em;
+  font-weight: bold;
+  font-size: 1.1em;
+}
+
+.note {
+  position: absolute;
+  background-color: #dddddd;
+  border: 1px solid #aaaaaa;
+  padding: 0.2em;
+  text-align: left;
+  z-index: 1;
+  white-space: normal;
+  box-sizing: border-box;
+}
+
+.note-collapsed {
+  height: 2em;
+  overflow: hidden;
+}
+
+.note-collapsed:hover {
+  z-index: 2;
+  height: auto;
 }

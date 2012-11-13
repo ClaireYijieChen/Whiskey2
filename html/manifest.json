@@ -15,8 +15,8 @@
   },
   "permissions": [
     "unlimitedStorage",
-    "http://*/*",
+    "<all_urls>",
+    "idle",
     "notifications"
   ]
 }
-
