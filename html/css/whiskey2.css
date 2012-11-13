@@ -84,7 +84,8 @@
   display: inline-block;
   border: 1px solid #aaaaaa;
   box-shadow: 0 0 2px #888888;
-  margin: 2em;
+  margin-left: 2em;
+  margin-right: 2em;
   overflow: visible;
   position: relative;
 }
@@ -104,13 +105,18 @@
 
 .note {
   position: absolute;
-  background-color: #dddddd;
+  background-color: #eeeeee;
   border: 1px solid #aaaaaa;
   padding: 0.2em;
   text-align: left;
   z-index: 1;
   white-space: normal;
   box-sizing: border-box;
+  box-shadow: 1px 1px 2px #aaaaaa;
+}
+
+.note:hover {
+  box-shadow: 2px 2px 3px #aaaaaa;
 }
 
 .note-collapsed {
@@ -121,4 +127,34 @@
 .note-collapsed:hover {
   z-index: 2;
   height: auto;
+}
+
+.note-color-button {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    vertical-align: text-top;
+    background-color: #dddddd;
+    border: 1px solid #aaaaaa;
+}
+
+.note-color0 {
+    background-color: #EFFAB4;
+    border-color: #AFBA84
+}
+.note-color1 {
+    background-color: #D1F2A5;
+    border-color: #91C275;
+}
+.note-color2 {
+    background-color: #FFC48C;
+    border-color: #CF844C;
+}
+.note-color3 {
+    background-color: #FF9F80;
+    border-color: #BF5F40;
+}
+.note-color4 {
+    background-color: #F56991;
+    border-color: #B52951;
 }

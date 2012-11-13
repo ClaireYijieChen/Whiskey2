@@ -20,10 +20,8 @@ class Whiskey2
     @syncProgress = $(document.createElement('div')).addClass('progress progress-striped active')
     @syncProgressBar = $(document.createElement('div')).addClass('bar').appendTo(@syncProgress)
     @manager.on_sync.on 'start', =>
-      log 'Sync started'
       @syncAlert = @showAlert 'Please stand by...', persistent: yes, content: @syncProgress
     @manager.on_sync.on 'finish', =>
-      log 'Sync finished'
       @syncAlert.remove()
     @oauth.token = @manager.get('token', 'no-value')
     @manager.open (error) =>
@@ -32,7 +30,6 @@ class Whiskey2
         @showError error
       @showAlert 'Application started', severity: 'success'
       @oauth.on_token_error = =>
-        log 'Asking for username/password'
         @showLoginDialog()
       @bindMain()
       @refreshNotepads()
@@ -87,7 +84,7 @@ class Whiskey2
     $('#main-tabs-content .main-tab-notepad').remove()
     @manager.storage.select 'notepads', ['archived', {op: '<>', var: 1}], (err, arr) =>
       if err then return @showError err
-      log 'Notepads:', arr
+      # log 'Notepads:', arr
       for item in arr
         log 'Item', item
         li = $(document.createElement('li')).addClass('main-tab-notepad')
@@ -307,7 +304,6 @@ class Notepad
           log 'Dropped sheet', otherSheet, index, i
           if otherSheet and index isnt -1
             e.stopPropagation()
-
           return no
         divItem.bind 'mouseover', (e) =>
           divItem.addClass('notepad-sheet-miniature-hover')
@@ -349,6 +345,21 @@ class Notepad
     $('#note-dialog').modal('show')
     $('#note-dialog-text').val(note.text ? '').focus()
     $('#note-dialog-collapsed').attr 'checked': if note.collapsed then yes else no
+    colors = $('#note-dialog-colors').empty()
+    widths = $('#note-dialog-widths').empty()
+    for color in [0...@colors]
+      a = $(document.createElement('a')).addClass('btn').attr(href: '#').data('index', color)
+      a.appendTo colors
+      if (note.color ? 0) is color
+        a.addClass 'active'
+      adiv = $(document.createElement('div')).addClass('note-color-button note-color'+color).html('&nbsp;').appendTo(a)
+    colors.button()
+    for width in @noteWidths
+      a = $(document.createElement('a')).addClass('btn').attr(href: '#').data('width', width)
+      a.text("#{width}%").appendTo widths
+      if (note.width ? @noteWidths[0]) is width
+        a.addClass 'active'
+    widths.button()
     $('#do-remove-note-dialog').unbind('click').bind 'click', (e) =>
       if not note.id then return
       @app.showPrompt 'Are you sure want to remove note?', () =>
@@ -359,9 +370,13 @@ class Notepad
     $('#do-save-note-dialog').unbind('click').bind 'click', (e) =>
       text = $('#note-dialog-text').val().trim()
       collapsed = $('#note-dialog-collapsed').attr 'checked'
-      log 'Save', collapsed
+      color = colors.find('a.active').data('index')
+      width = widths.find('a.active').data('width')
+      log 'Save', collapsed, color, width
       if not text then return @app.showError 'Text is empty'
       note.text = text
+      note.color = color
+      note.width = width
       note.collapsed = if collapsed then yes else no
       _handler = (err, data) =>
         if err then return @app.showError err
