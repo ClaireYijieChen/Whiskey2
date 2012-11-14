@@ -1548,6 +1548,96 @@
       });
     };
 
+    DataManager.prototype.removeCascade = function(stream, object, handler) {
+      var fk, gr, key, keys, select, selects, _i, _j, _len, _len2, _ref, _results,
+        _this = this;
+      if (!this.storage._precheck(stream, handler)) return;
+      keys = (_ref = this.storage.schema._fkeys) != null ? _ref : [];
+      selects = [];
+      for (_i = 0, _len = keys.length; _i < _len; _i++) {
+        key = keys[_i];
+        if (_.startsWith(key.pk, stream + '.id')) {
+          fk = key.fk.split('.');
+          if (fk.length !== 2) continue;
+          selects.push({
+            stream: fk[0],
+            query: [fk[1], object.id]
+          });
+        }
+      }
+      gr = new AsyncGrouper(selects.length, function(gr) {
+        var arr, config, data, err, i, _j, _len2, _ref2, _ref3;
+        err = gr.findError();
+        if (err) return handler(err);
+        config = [];
+        config.push({
+          type: 'remove',
+          stream: stream,
+          object: object
+        });
+        for (i = 0, _ref2 = gr.results.length; 0 <= _ref2 ? i < _ref2 : i > _ref2; 0 <= _ref2 ? i++ : i--) {
+          arr = gr.results[i];
+          _ref3 = arr[0];
+          for (_j = 0, _len2 = _ref3.length; _j < _len2; _j++) {
+            data = _ref3[_j];
+            config.push({
+              type: 'removeCascade',
+              stream: selects[i].stream,
+              object: data
+            });
+          }
+        }
+        return _this.batch(config, handler);
+      });
+      _results = [];
+      for (_j = 0, _len2 = selects.length; _j < _len2; _j++) {
+        select = selects[_j];
+        _results.push(this.storage.select(select.stream, select.query, gr.fn));
+      }
+      return _results;
+    };
+
+    DataManager.prototype.batch = function(config, handler) {
+      var ag, item, _i, _len, _results,
+        _this = this;
+      if (config == null) config = [];
+      ag = new AsyncGrouper(config.length, function(ag) {
+        var arr, err, result, _i, _len, _ref;
+        err = ag.findError();
+        result = [];
+        _ref = ag.results;
+        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+          arr = _ref[_i];
+          result.push(arr[0]);
+        }
+        if (handler) return handler(err, result);
+      });
+      _results = [];
+      for (_i = 0, _len = config.length; _i < _len; _i++) {
+        item = config[_i];
+        switch (item.type) {
+          case 'create':
+            _results.push(this.storage.create(item.stream, item.object, ag.fn, item.options));
+            break;
+          case 'update':
+            _results.push(this.storage.update(item.stream, item.object, ag.fn, item.options));
+            break;
+          case 'remove':
+            _results.push(this.storage.remove(item.stream, item.object, ag.fn, item.options));
+            break;
+          case 'removeCascade':
+            _results.push(this.removeCascade(item.stream, item.object, ag.fn, item.options));
+            break;
+          case 'findOne':
+            _results.push(this.findOne(item.stream, item.id, ag.fn));
+            break;
+          default:
+            _results.push(ag._fn(null));
+        }
+      }
+      return _results;
+    };
+
     DataManager.prototype._save = function(stream, object, handler) {
       var _this = this;
       if (!object.id) {

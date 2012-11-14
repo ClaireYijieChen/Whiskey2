@@ -74,6 +74,7 @@
           </div>
           <div class="modal-footer">
               <a href="#" class="btn btn-primary" id="do-save-sheet-dialog">Save</a>
+              <a href="#" class="btn btn-warning" id="do-remove-sheet-dialog">Remove</a>
           </div>
         </div>
         <div class="modal hide" id="note-dialog">
@@ -134,10 +135,12 @@
               <a href="#" class="btn btn-primary" id="main-do-add-notepad">Add</a>
           </div>
         </div>
-        <div id="sheet-toolbar-template" class="hide btn-toolbar">
-          <div class="btn-group">
-            <a class="btn sheet-toolbar-edit" href="#"><i class="icon-pencil"></i></a>
-            <a class="btn sheet-toolbar-remove" href="#"><i class="icon-trash"></i></a>
+        <div id="sheet-toolbar-template" class="hide sheet-toolbar">
+          <div class="btn-toolbar">
+            <div class="btn-group">
+              <a class="btn sheet-toolbar-edit" href="#"><i class="icon-pencil"></i></a>
+              <a class="btn sheet-toolbar-remove" href="#"><i class="icon-trash"></i></a>
+            </div>
           </div>
         </div>
         <div id="main-notepad-template" class="hide">
@@ -150,6 +153,8 @@
                   <li><a href="#" class="notepad-add-sheet">Add sheet</a></li>
                 </ul>
                 <ul class="nav pull-right">
+                  <li><a href="#" class="notepad-zoom-in">Zoom in</a></li>
+                  <li><a href="#" class="notepad-zoom-out">Zoom out</a></li>
                   <li>
                     <a href="#" class="dropdown-toggle" data-toggle="dropdown">More <b class="caret"></b></a>
                     <ul class="dropdown-menu">
@@ -163,7 +168,9 @@
           </div>
           <div class="notepad-root">
             <div class="notepad-sheets"></div>
-            <div class="notepad-content"></div>
+            <div class="notepad-content">
+              <div class="notepad-sheets-wrap"></div>
+            </div>
           </div>
       </div>
 
