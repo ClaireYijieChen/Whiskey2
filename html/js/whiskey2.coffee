@@ -80,27 +80,42 @@ class Whiskey2
     return offset
 
   refreshNotepads: (selectID) ->
-    $('#main-tabs li.main-tab-notepad').remove()
-    $('#main-tabs-content .main-tab-notepad').remove()
     @manager.storage.select 'notepads', ['archived', {op: '<>', var: 1}], (err, arr) =>
       if err then return @showError err
       # log 'Notepads:', arr
-      for item in arr
-        log 'Item', item
+      $('#main-tabs li.main-tab-notepad').remove()
+      $('#main-tabs-content .main-tab-notepad').remove()
+      @notepads = {}
+      @sortWithNext arr
+      moveNotepad = (index, id) =>
+        @moveWithNext 'notepads', arr, index, [id], (err) =>
+          if err then return @showError err
+          @refreshNotepads selectID
+      for i in [0...arr.length]
+        item = arr[i] # Revert
         li = $(document.createElement('li')).addClass('main-tab-notepad')
         a = $(document.createElement('a')).attr(href: '#np'+item.id).text(' '+item.name).appendTo li
         a.prepend('<i class="icon-book"></i>')
-        $('#main-tabs').prepend li
+        li. insertBefore $('#main-tab-templates')
         div = $(document.createElement('div')).addClass('tab-pane main-tab-notepad').attr(id: 'np'+item.id)
         $('#main-tabs-content').append(div)
-        do (a) =>
+        do (a, item, i) =>
+          a.bind 'dragstart', (e) =>
+            @dragSetType e, 'custom/notepad', {id: item.id}
           a.bind 'dragover', (e) =>
-            if @dragHasType e, 'custom/note'
+            if (@dragHasType e, 'custom/note') or (@dragHasType e, 'custom/sheet') or (@dragHasType e, 'custom/notepad')
               e.preventDefault()
           a.bind 'dragenter', (e) =>
-            if @dragHasType e, 'custom/note'
+            if @dragHasType e, 'custom/notepad'
+              e.preventDefault()
+            if (@dragHasType e, 'custom/note') or (@dragHasType e, 'custom/sheet')
               a.tab('show')
               e.preventDefault()
+          a.bind 'drop', (e) =>
+            notepadData = @dragGetType e, 'custom/notepad'
+            if notepadData
+              moveNotepad i, notepadData.id
+              e.stopPropagation()
           a.bind 'click', (e) =>
             e.preventDefault()
             a.tab('show')
@@ -120,7 +135,9 @@ class Whiskey2
 
   renderNotepad: (parent, notepad) ->
     div = $('#main-notepad-template').clone().appendTo(parent).removeClass('hide')
-    return new Notepad @, notepad, div
+    n = new Notepad @, notepad, div
+    @notepads[notepad.id] = n
+    return n
 
   doLogin: ->
     login = $('#main-login').val().trim()
@@ -180,37 +197,47 @@ class Whiskey2
   getTemplate: (id) ->
     return @emptyTemplate
 
-  findByID: (arr, id, start = 0) ->
+  findByID: (arr, id, attr = 'id') ->
     if not id then return -1
-    for i in [start...arr.length]
-      if arr[i].id is id then return i
+    for i in [0...arr.length]
+      if arr[i][attr] is id then return i
     return -1
+
+  addUnique: (array, item, attr = 'id') ->
+    # Adds element only when it's not here
+    index = @findByID array, item[attr], attr
+    if index is -1 then array.push item
 
   removeWithNext: (sink, array, items) ->
     # Removes items and adds updated elements to array
     for item in items
-      index = @findByID array, item.id
-      if index is -1 then continue
-      # item at the left will refer to item at the right
-      if index>0
-        if index<array.length-1
-          # link
-          array[index-1].next_id = array[index+1].id
+      left_index = @findByID array, item.id, 'next_id' # someone refers to me?
+      if left_index isnt -1
+        # someone refer to me
+        right_index = @findByID array, item.next_id # I refer to someone?
+        if right_index isnt -1
+          array[left_index].next_id = item.next_id
         else
-          # null
-          array[index-1].next_id = null
-        if @findByID sink, array[index-1].id is -1 then sink.add array[index-1]
+          array[left_index].next_id = null
+        @addUnique sink, array[left_index]
 
-  addWithNext: (sink, array, before, items) ->
-    # Adds items to array and updates next_id. if before is -1 - add to the end
+  addWithNext: (sink, array, after, items) ->
+    # Adds items to array and updates next_id. if after is -1 - add to the begin
     if not items?.length then return
-    if not array?.length
-      next_id = null
-      for item in items
-        item.next_id = next_id
-        next_id = item.id
-      return
     next_id = null
+    right_index = 0
+    if after isnt -1
+      # have after - fill next_id and update array[after]
+      right_index = after+1
+      next_id = array[after].next_id # save next_id
+      array[after].next_id = items[0].id
+      @addUnique sink, array[after] # after refers to first element
+    else
+      # add to the top - save firtst id as next_id
+      if array.length>0 then next_id = array[0].id
+    for i in [0...items.length-1]
+      items[i].next_id = items[i+1].id
+    items[items.length-1].next_id = next_id # link last item to next_id
 
   sortWithNext: (items) ->
     if not items?.length then return items
@@ -219,13 +246,15 @@ class Whiskey2
       item = items[i]
       # Have next_id
       index = @findByID items, item.next_id
+      # log 'sortWithNext', i, item, index
       if index isnt -1
         # found
         found = items[index]
         if index<i
           # left
-          items.splice i, 1
-          items.splice index, 0, found
+          items.splice i+1, 0, found
+          items.splice index, 1
+          i-- # Check one more time
         else
           if index>i+1
             # right (not same and not next)
@@ -234,22 +263,67 @@ class Whiskey2
       i++ # next item
     return items
 
+  moveWithNext: (stream, array, index, ids, handler, adapter) ->
+    # log 'moveWithNext', index, ids, array
+    ag = new AsyncGrouper ids.length, () =>
+      err = ag.findError()
+      # log 'Search sheets', err, ag.results
+      if err then return handler err
+      items = []
+      sink = []
+      for arr in ag.results
+        items.push arr[0]
+        sink.push arr[0]
+      # log 'Before remove', items, sink
+      @removeWithNext sink, array, items
+      # log 'After remove', items, sink
+      @addWithNext sink, array, index, items
+      # log 'After add', items, sink
+      config = []
+      for item in sink
+        if adapter then adapter(item)
+        config.push type: 'update', stream: stream, object: item
+      @manager.batch config, (err) =>
+        # log 'After update', err
+        if err then return handler err
+        handler null
+    for id in ids
+      @manager.findOne stream, id, ag.fn
+
 class Notepad
+
+  zoom: 1
+  zoomStep: 0.1
 
   constructor: (@app, @notepad, @div) ->
     @div.find('.notepad-name').text(@notepad.name)
     @divMiniatures = div.find('.notepad-sheets')
-    @divContent = div.find('.notepad-content')
+    @divContent = div.find('.notepad-sheets-wrap')
     @div.find('.notepad-add-sheet').bind 'click', () =>
       @showSheetDialog {}, =>
         @reloadSheets()
     @div.find('.notepad-reload-sheets').bind 'click', =>
       @reloadSheets()
+    @div.find('.notepad-zoom-in').bind 'click', =>
+      @zoomInOut 1
+    @div.find('.notepad-zoom-out').bind 'click', =>
+      @zoomInOut -1
+    @initSheetPlaceholders()
     @reloadSheets()
+
+  zoomInOut: (direction = 1) ->
+    if direction<0 and @zoom<=@zoomStep then return
+    @zoom += direction*@zoomStep
+    @divContent.css 'transform': "scale(#{@zoom}, #{@zoom})"
 
   showSheetDialog: (sheet, handler) ->
     $('#sheet-dialog-name').val(sheet.title ? '')
     $('#sheet-dialog').modal('show')
+    $('#do-remove-sheet-dialog').unbind('click').bind 'click', (e) =>
+      if not sheet.id then return
+      @app.showPrompt 'Are you sure want to remove sheet? It will remove notes also', =>
+        @removeSheets [sheet.id]
+      $('#sheet-dialog').modal('hide')
     $('#do-save-sheet-dialog').unbind('click').bind 'click', (e) =>
       name = $('#sheet-dialog-name').val().trim()
       if not name then return @app.showError 'Title is empty'
@@ -265,9 +339,31 @@ class Notepad
       else
         @app.manager.storage.update 'sheets', sheet, _handler
 
+  removeSheets: (ids) ->
+    sink = []
+    items = []
+    config = []
+    for id in ids
+      config.push stream: 'sheets', type: 'removeCascade', object: {id: id}
+      items.push id: id
+    @app.removeWithNext sink, @sheets, items
+    for item in sink
+      config.push type: 'update', stream: 'sheets', object: item
+    @app.manager.batch config, (err) =>
+      if err then return @app.showError err
+      @reloadSheets()
+
+  moveSheets: (index, data) ->
+    @app.moveWithNext 'sheets', @sheets, index, data.ids, (err) =>
+      if err then return @app.showError err
+      @reloadSheets()
+    , (item) =>
+      item.notepad_id = @notepad.id
+
   renderSheetMiniatures: (sheets) ->
     div = @divMiniatures
     div.empty()
+    @selectedSheets = {}
     if not sheets?.length then return
     minHeight = 3
     maxHeight = 30
@@ -291,18 +387,34 @@ class Notepad
       do (i, sheet, divItem) =>
         divItem.bind 'click', (e) =>
           e.preventDefault()
+          if e.ctrlKey
+            if @selectedSheets[sheet.id]
+              # Unselect
+              delete @selectedSheets[sheet.id]
+              divItem.removeClass 'notepad-sheet-miniature-selected'
+            else
+              @selectedSheets[sheet.id] = yes
+              divItem.addClass 'notepad-sheet-miniature-selected'
+            return
+          div.find('.notepad-sheet-miniature-selected').removeClass 'notepad-sheet-miniature-selected'
+          @selectedSheets = {}
           @loadSheets i
         divItem.bind 'dragstart', (e) =>
-          @app.dragSetType e, 'custom/sheet', sheet
+          if @selectedSheets[sheet.id]
+            ids = []
+            for id of @selectedSheets
+              ids.push id
+            @app.dragSetType e, 'custom/sheet', {ids: ids}
+          else
+            @app.dragSetType e, 'custom/sheet', {ids: [sheet.id]}
         divItem.bind 'dragover', (e) =>
           if @app.dragHasType e, 'custom/sheet'
             e.preventDefault()
           return no
         divItem.bind 'drop', (e) =>
-          otherSheet = @app.dragGetType e, 'custom/sheet'
-          index = @app.findByID sheets, otherSheet?.id
-          log 'Dropped sheet', otherSheet, index, i
-          if otherSheet and index isnt -1
+          sheetsData = @app.dragGetType e, 'custom/sheet'
+          if sheetsData
+            @moveSheets i, sheetsData
             e.stopPropagation()
           return no
         divItem.bind 'mouseover', (e) =>
@@ -328,16 +440,27 @@ class Notepad
         if index isnt -1 then @loadSheets index
 
   maxSheetsVisible: 2
+
+  initSheetPlaceholders: () ->
+    @sheetDivs = []
+    for i in [0...@maxSheetsVisible]
+      div = $(document.createElement('div')).addClass('sheet').appendTo @divContent
+      divContent = $(document.createElement('div')).addClass('sheet_content').appendTo div
+      divTitle = $(document.createElement('div')).addClass('sheet_title').appendTo div
+      divToolbar = $('#sheet-toolbar-template').clone().removeClass('hide').appendTo div
+      @sheetDivs.push div
+
   loadSheets: (index) ->
-    @divContent.empty()
-    width = @divContent.innerWidth()
-    totalWidth = 0
+    @selectedNotes = {}
     @lastSheetID = @sheets[index]?.id
     count = 0
-    while totalWidth<width and count<@maxSheetsVisible
-      div = @loadSheet(index)
-      if not div then break
-      totalWidth += div.outerWidth()
+    while count<@maxSheetsVisible
+      div = @sheetDivs[count]
+      if not @sheets[index]
+        div.hide()
+      else
+        div.show()
+        @loadSheet(index, div)
       index++
       count++
 
@@ -389,6 +512,10 @@ class Notepad
       else
         @app.manager.storage.update 'notes', note, _handler
 
+  resetNoteSelection: ->
+    @selectedNotes = {}
+    @divContent.find('.note-selected').removeClass('note-selected')
+
   loadNotes: (sheet, parent) ->
     preciseEm = (value) =>
       return Math.floor(value*10/@zoomFactor)/10
@@ -396,9 +523,26 @@ class Notepad
       # log 'loadNote', note
       div = $(document.createElement('div')).addClass('note').appendTo(parent)
       div.attr draggable: yes
+      div.bind 'click', (e) =>
+        e.preventDefault()
+        if e.ctrlKey
+          if @selectedNotes[note.id]
+            delete @selectedNotes[note.id]
+            div.removeClass 'note-selected'
+          else
+            @selectedNotes[note.id] = yes
+            div.addClass 'note-selected'
+        else
+          @resetNoteSelection()
       div.bind 'dragstart', (e) =>
         offset = @app.dragGetOffset e, div
-        @app.dragSetType e, 'custom/note', {id: note.id, x: offset.left, y: offset.top}
+        if @selectedNotes[note.id]
+          ids = []
+          for id of @selectedNotes
+            ids.push id
+          @app.dragSetType e, 'custom/note', {ids: ids, x: offset.left, y: offset.top}
+        else
+          @app.dragSetType e, 'custom/note', {id: note.id, x: offset.left, y: offset.top}
       div.bind 'dblclick', (e) =>
         @showNotesDialog sheet, note, () =>
           @reloadSheets()
@@ -420,33 +564,33 @@ class Notepad
             $(document.createElement('div')).addClass('note-br').html('&nbsp;').appendTo div
         else
           $(document.createElement('div')).addClass('note-line').appendTo(div).text line
-    parent.empty()
     # , 'archived', {op: '<>', var: 1}
     @app.manager.storage.select 'notes', ['sheet_id', sheet.id], (err, arr) =>
       if err then return @app.showError err
+      parent.empty()
       for item in arr
         loadNote item
   noteWidths: [50, 75, 90, 125]
   zoomFactor: 5
   colors: 5
+  gridStep: 6
 
-  loadSheet: (index) ->
+  loadSheet: (index, div) ->
     offsetToCoordinates = (x, y) ->
       [Math.floor(x/divContent.width()*template.width), Math.floor(y/divContent.height()*template.height)]
     sheet = @sheets[index]
     if not sheet then return null
     template = @app.getTemplate sheet.template_id
-    div = $(document.createElement('div')).addClass('sheet').appendTo @divContent
-    divContent = $(document.createElement('div')).addClass('sheet_content').appendTo div
+    divContent = div.find('.sheet_content')
     width = Math.floor(template.width/@zoomFactor)
     height = Math.floor(template.height/@zoomFactor)
     divContent.css width: "#{width}em", height: "#{height}em"
-    divTitle = $(document.createElement('div')).addClass('sheet_title').appendTo div
+    divTitle = div.find('.sheet_title')
     divTitle.text(sheet.title ? 'Untitled')
-    divToolbar = $('#sheet-toolbar-template').clone().removeClass('hide').appendTo div
-    divToolbar.find('.sheet-toolbar-edit').bind 'click', ()=>
+    div.find('.sheet-toolbar-edit').unbind('click').bind 'click', ()=>
       @showSheetDialog sheet, =>
         @reloadSheets()
+    divContent.unbind()
     divContent.bind 'dblclick', (e) =>
       [x, y] = offsetToCoordinates e.offsetX, e.offsetY
       @showNotesDialog sheet, {x: x, y: y}, () =>
@@ -459,16 +603,33 @@ class Notepad
     divContent.bind 'drop', (e) =>
       if @app.dragHasType e, 'custom/note'
         otherNote = @app.dragGetType e, 'custom/note'
-        @app.manager.findOne 'notes', otherNote?.id, (err, note) =>
-          if err then return @app.showError err
-          offset = @app.dragGetOffset e, divContent
-          [x, y] = offsetToCoordinates offset.left-otherNote.x, offset.top-otherNote.y
-          note.x = x
-          note.y = y
-          note.sheet_id = sheet.id
-          @app.manager.storage.update 'notes', note, (err) =>
+        offset = @app.dragGetOffset e, divContent
+        [x, y] = offsetToCoordinates offset.left-otherNote.x, offset.top-otherNote.y
+        if otherNote.id
+          @app.manager.findOne 'notes', otherNote?.id, (err, note) =>
             if err then return @app.showError err
-            @reloadSheets()
+            note.x = x
+            note.y = y
+            note.sheet_id = sheet.id
+            @app.manager.storage.update 'notes', note, (err) =>
+              if err then return @app.showError err
+              @reloadSheets()
+        else
+          config = []
+          for id in otherNote.ids
+            config.push type: 'findOne', id: id, stream: 'notes'
+          @app.manager.batch config, (err, arr) =>
+            if err then return @app.showError err
+            updates = []
+            for note in arr
+              note.sheet_id = sheet.id
+              note.x = x
+              note.y = y
+              y+= @gridStep*2
+              updates.push type: 'update', stream: 'notes', object: note
+            @app.manager.batch updates, (err) =>
+              if err then return @app.showError err
+              @reloadSheets()
       return false
     @loadNotes sheet, divContent
     return div

@@ -275,6 +275,7 @@ var AsyncGrouper = function(count, handler) {//Run async tasks, call handler whe
     this.err = _.bind(this._err, this);
     this.fn = _.bind(this._fn, this);
     this.handlerCalled = false;
+    this.check();
 };
 
 AsyncGrouper.prototype.check = function() {//Check count status
@@ -334,7 +335,7 @@ ui.remoteScriptLoader = function (url, object, handler) {
             s.src = url;
             doc.body.appendChild(s);
             var bridge = {
-                
+
             };
             bridge['_'+object] = function () {
                 log('Get!', object, _.keys(event.target.contentWindow));

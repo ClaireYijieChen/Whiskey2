@@ -51,6 +51,9 @@
   text-align: center;
 }
 
+.notepad-sheets-wrap {
+}
+
 .notepad-sheet-miniature {
   box-sizing: border-box;
   width: 200px;
@@ -59,6 +62,10 @@
   background-color: #ffffff;
   left: -180px;
   position: absolute;
+}
+
+.notepad-sheet-miniature-selected {
+  border-right: 6px solid #91C275;
 }
 
 .notepad-sheet-miniature-title {
@@ -71,7 +78,6 @@
 
 .notepad-sheet-miniature-hover {
   left: 0px;
-  border-color: #888888;
   box-shadow: 1px 1px 2px #888888;
   cursor: pointer;
 }
@@ -83,16 +89,16 @@
 .sheet {
   display: inline-block;
   border: 1px solid #aaaaaa;
-  box-shadow: 0 0 2px #888888;
-  margin-left: 2em;
-  margin-right: 2em;
+  box-shadow: 0 0 3px #888888;
+  margin-left: 1em;
+  margin-right: 1em;
   overflow: visible;
   position: relative;
+  vertical-align: middle;
 }
 
 .sheet_content {
   position: relative;
-  border-bottom: 1px dashed #aaaaaa;
 }
 
 .sheet_title {
@@ -122,11 +128,15 @@
 .note-collapsed {
   height: 2em;
   overflow: hidden;
+  border-bottom-style: dashed;
+  border-bottom-width: 2px;
 }
 
 .note-collapsed:hover {
   z-index: 2;
   height: auto;
+  border-bottom-style: solid;
+  border-bottom-width: 1px;
 }
 
 .note-color-button {
@@ -157,4 +167,23 @@
 .note-color4 {
     background-color: #F56991;
     border-color: #B52951;
+}
+
+.sheet-toolbar {
+  border-top: 1px dashed #aaaaaa;
+  position: absolute;
+  width: 100%;
+  bottom: 0;
+  height: 0.4em;
+  overflow: hidden;
+  background-color: rgba(255, 255, 255, 0.5);
+}
+
+.sheet-toolbar:hover {
+  height: auto;
+  z-index: 3;
+}
+
+.note-selected {
+  box-shadow: 0px 0px 4px 4px #91C275 !important;
 }
