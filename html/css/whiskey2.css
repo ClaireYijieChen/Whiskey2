@@ -129,7 +129,7 @@
   height: 2em;
   overflow: hidden;
   border-bottom-style: dashed;
-  border-bottom-width: 2px;
+  border-bottom-width: 1px;
 }
 
 .note-collapsed:hover {
