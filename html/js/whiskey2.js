@@ -706,6 +706,7 @@
       this.selectedNotes = {};
       this.lastSheetID = (_ref = this.sheets[index]) != null ? _ref.id : void 0;
       count = 0;
+      this.notes = [];
       _results = [];
       while (count < this.maxSheetsVisible) {
         div = this.sheetDivs[count];
@@ -722,7 +723,7 @@
     };
 
     Notepad.prototype.showNotesDialog = function(sheet, note, handler) {
-      var a, adiv, color, colors, width, widths, _i, _len, _ref, _ref2, _ref3, _ref4, _ref5,
+      var a, adiv, color, colors, currentColor, currentWidth, width, widths, _i, _len, _ref, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7,
         _this = this;
       $('#note-dialog').modal('show');
       $('#note-dialog-text').val((_ref = note.text) != null ? _ref : '').focus();
@@ -731,27 +732,25 @@
       });
       colors = $('#note-dialog-colors').empty();
       widths = $('#note-dialog-widths').empty();
-      for (color = 0, _ref2 = this.colors; 0 <= _ref2 ? color < _ref2 : color > _ref2; 0 <= _ref2 ? color++ : color--) {
-        a = $(document.createElement('a')).addClass('btn').attr({
+      currentColor = (_ref2 = note.color) != null ? _ref2 : (_ref3 = this.lastColor) != null ? _ref3 : 0;
+      currentWidth = (_ref4 = note.width) != null ? _ref4 : (_ref5 = this.lastWidth) != null ? _ref5 : this.noteWidths[0];
+      for (color = 0, _ref6 = this.colors; 0 <= _ref6 ? color < _ref6 : color > _ref6; 0 <= _ref6 ? color++ : color--) {
+        a = $(document.createElement('a')).addClass('btn btn-small').attr({
           href: '#'
         }).data('index', color);
         a.appendTo(colors);
-        if (((_ref3 = note.color) != null ? _ref3 : 0) === color) {
-          a.addClass('active');
-        }
+        if (currentColor === color) a.addClass('active');
         adiv = $(document.createElement('div')).addClass('note-color-button note-color' + color).html('&nbsp;').appendTo(a);
       }
       colors.button();
-      _ref4 = this.noteWidths;
-      for (_i = 0, _len = _ref4.length; _i < _len; _i++) {
-        width = _ref4[_i];
+      _ref7 = this.noteWidths;
+      for (_i = 0, _len = _ref7.length; _i < _len; _i++) {
+        width = _ref7[_i];
         a = $(document.createElement('a')).addClass('btn').attr({
           href: '#'
         }).data('width', width);
         a.text("" + width + "%").appendTo(widths);
-        if (((_ref5 = note.width) != null ? _ref5 : this.noteWidths[0]) === width) {
-          a.addClass('active');
-        }
+        if (currentWidth === width) a.addClass('active');
       }
       widths.button();
       $('#do-remove-note-dialog').unbind('click').bind('click', function(e) {
@@ -785,6 +784,8 @@
           if (handler) return handler(note);
         };
         if (!note.id) {
+          _this.lastColor = note.color;
+          _this.lastWidth = note.width;
           note.sheet_id = sheet.id;
           return _this.app.manager.storage.create('notes', note, _handler);
         } else {
@@ -798,17 +799,19 @@
       return this.divContent.find('.note-selected').removeClass('note-selected');
     };
 
+    Notepad.prototype.preciseEm = function(value) {
+      return Math.floor(value * 100 / this.zoomFactor) / 100;
+    };
+
     Notepad.prototype.loadNotes = function(sheet, parent) {
-      var loadNote, preciseEm,
+      var loadNote,
         _this = this;
-      preciseEm = function(value) {
-        return Math.floor(value * 10 / _this.zoomFactor) / 10;
-      };
       loadNote = function(note) {
         var div, i, line, lines, width, x, y, _ref, _ref2, _ref3, _ref4, _ref5, _ref6, _results;
         div = $(document.createElement('div')).addClass('note').appendTo(parent);
         div.attr({
-          draggable: true
+          draggable: true,
+          id: 'note' + note.id
         });
         div.bind('click', function(e) {
           e.preventDefault();
@@ -854,9 +857,9 @@
         });
         div.addClass('note-color0 note-color' + ((_ref = note.color) != null ? _ref : 0));
         width = (_ref2 = note.width) != null ? _ref2 : _this.noteWidths[0];
-        width = preciseEm(width);
-        x = preciseEm((_ref3 = note.x) != null ? _ref3 : 0);
-        y = preciseEm((_ref4 = note.y) != null ? _ref4 : 0);
+        width = _this.preciseEm(width);
+        x = _this.preciseEm((_ref3 = note.x) != null ? _ref3 : 0);
+        y = _this.preciseEm((_ref4 = note.y) != null ? _ref4 : 0);
         div.css({
           width: "" + width + "em",
           left: "" + x + "em",
@@ -886,7 +889,8 @@
         _results = [];
         for (_i = 0, _len = arr.length; _i < _len; _i++) {
           item = arr[_i];
-          _results.push(loadNote(item));
+          loadNote(item);
+          _results.push(_this.notes.push(item));
         }
         return _results;
       });
@@ -896,13 +900,54 @@
 
     Notepad.prototype.zoomFactor = 5;
 
-    Notepad.prototype.colors = 5;
+    Notepad.prototype.colors = 8;
 
     Notepad.prototype.gridStep = 6;
 
     Notepad.prototype.loadSheet = function(index, div) {
-      var divContent, divTitle, height, offsetToCoordinates, sheet, template, width, _ref,
+      var clearSelector, divContent, divTitle, height, inRectangle, notesInRectangle, offsetToCoordinates, sheet, template, width, _ref,
         _this = this;
+      clearSelector = function() {
+        if (_this.selectorDiv) {
+          _this.selectorDiv.remove();
+          return _this.selectorDiv = null;
+        }
+      };
+      clearSelector();
+      inRectangle = function(x1, y1, x2, y2, x3, y3, x4, y4) {
+        var x_overlap, y_overlap;
+        x_overlap = Math.min(x2, x4) - Math.max(x1, x3);
+        y_overlap = Math.min(y2, y4) - Math.max(y1, y3);
+        if (x_overlap >= 0 && y_overlap >= 0) {
+          return true;
+        } else {
+          return false;
+        }
+      };
+      notesInRectangle = function(x1, y1, x2, y2) {
+        var height, note, noteDiv, notes, width, _i, _len, _ref, _ref2, _ref3, _ref4, _ref5;
+        if (x1 > x2) _ref = [x2, x1], x1 = _ref[0], x2 = _ref[1];
+        if (y1 > y2) _ref2 = [y2, y1], y1 = _ref2[0], y2 = _ref2[1];
+        notes = [];
+        _ref4 = (_ref3 = _this.notes) != null ? _ref3 : [];
+        for (_i = 0, _len = _ref4.length; _i < _len; _i++) {
+          note = _ref4[_i];
+          noteDiv = divContent.children('#note' + note.id);
+          if (noteDiv.size() !== 1) continue;
+          _ref5 = offsetToCoordinates(noteDiv.outerWidth(), noteDiv.outerHeight()), width = _ref5[0], height = _ref5[1];
+          if (inRectangle(x1, y1, x2, y2, note.x, note.y, note.x + width, note.y + height)) {
+            notes.push(note);
+          }
+        }
+        return [
+          {
+            x: x1,
+            y: y1,
+            width: x2 - x1,
+            height: y2 - y1
+          }, notes
+        ];
+      };
       offsetToCoordinates = function(x, y) {
         return [Math.floor(x / divContent.width() * template.width), Math.floor(y / divContent.height() * template.height)];
       };
@@ -924,6 +969,64 @@
         });
       });
       divContent.unbind();
+      divContent.bind('mousedown', function(e) {
+        var coords, notes, offset, x, y, _ref2, _ref3;
+        offset = _this.app.dragGetOffset(e, divContent);
+        _ref2 = offsetToCoordinates(offset.left, offset.top), x = _ref2[0], y = _ref2[1];
+        _ref3 = notesInRectangle(x, y, x, y), coords = _ref3[0], notes = _ref3[1];
+        if (notes.length === 0 && e.ctrlKey) {
+          _this.selectorDiv = $(document.createElement('div')).appendTo(divContent).addClass('notes-selector');
+          _this.selectorDiv.css({
+            left: '' + _this.preciseEm(x) + 'em',
+            top: '' + _this.preciseEm(y) + 'em'
+          });
+          _this.selectorX = x;
+          _this.selectorY = y;
+          _this.selectorIndex = index;
+          return false;
+        }
+      });
+      divContent.bind('mouseup', function(e) {
+        var coords, note, notes, offset, x, y, _i, _len, _ref2, _ref3;
+        if (!e.ctrlKey && _this.selectorDiv) {
+          clearSelector();
+          return;
+        }
+        if (_this.selectorDiv && _this.selectorIndex === index) {
+          offset = _this.app.dragGetOffset(e, divContent);
+          _ref2 = offsetToCoordinates(offset.left, offset.top), x = _ref2[0], y = _ref2[1];
+          _ref3 = notesInRectangle(x, y, _this.selectorX, _this.selectorY), coords = _ref3[0], notes = _ref3[1];
+          for (_i = 0, _len = notes.length; _i < _len; _i++) {
+            note = notes[_i];
+            if (_this.selectedNotes[note.id]) {
+              delete _this.selectedNotes[note.id];
+              divContent.children('#note' + note.id).removeClass('note-selected');
+            } else {
+              _this.selectedNotes[note.id] = true;
+              divContent.children('#note' + note.id).addClass('note-selected');
+            }
+          }
+          return clearSelector();
+        }
+      });
+      divContent.bind('mousemove', function(e) {
+        var coords, notes, offset, x, y, _ref2, _ref3;
+        if (!e.ctrlKey && _this.selectorDiv) {
+          clearSelector();
+          return;
+        }
+        if (_this.selectorDiv && _this.selectorIndex === index) {
+          offset = _this.app.dragGetOffset(e, divContent);
+          _ref2 = offsetToCoordinates(offset.left, offset.top), x = _ref2[0], y = _ref2[1];
+          _ref3 = notesInRectangle(x, y, _this.selectorX, _this.selectorY), coords = _ref3[0], notes = _ref3[1];
+          return _this.selectorDiv.css({
+            left: '' + _this.preciseEm(coords.x) + 'em',
+            top: '' + _this.preciseEm(coords.y) + 'em',
+            width: '' + _this.preciseEm(coords.width) + 'em',
+            height: '' + _this.preciseEm(coords.height) + 'em'
+          });
+        }
+      });
       divContent.bind('dblclick', function(e) {
         var x, y, _ref2;
         _ref2 = offsetToCoordinates(e.offsetX, e.offsetY), x = _ref2[0], y = _ref2[1];
@@ -971,6 +1074,11 @@
               var note, updates, _j, _len2;
               if (err) return _this.app.showError(err);
               updates = [];
+              arr = arr.sort(function(a, b) {
+                if (a.y < b.y) return -1;
+                if (a.y > b.y) return 1;
+                return a.x - b.x;
+              });
               for (_j = 0, _len2 = arr.length; _j < _len2; _j++) {
                 note = arr[_j];
                 note.sheet_id = sheet.id;
