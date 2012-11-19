@@ -168,6 +168,18 @@
     background-color: #F56991;
     border-color: #B52951;
 }
+.note-color5 {
+    background-color: #FF9E9D;
+    border-color: #BF5E5D;
+}
+.note-color6 {
+    background-color: #FFF7BD;
+    border-color: #BFB77D;
+}
+.note-color7 {
+    background-color: #B9D7D9;
+    border-color: #799799;
+}
 
 .sheet-toolbar {
   border-top: 1px dashed #aaaaaa;
@@ -186,4 +198,14 @@
 
 .note-selected {
   box-shadow: 0px 0px 4px 4px #91C275 !important;
+}
+
+.notes-selector {
+    z-index: 4;
+    box-sizing: border-box;
+    border: 1px solid #69D2E7;
+    box-shadow: 0 0 3px 2px #69D2E7;
+    position: absolute;
+  background-color: rgba(105,210,231, 0.3);
+
 }

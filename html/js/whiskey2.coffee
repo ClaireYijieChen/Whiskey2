@@ -454,6 +454,7 @@ class Notepad
     @selectedNotes = {}
     @lastSheetID = @sheets[index]?.id
     count = 0
+    @notes = []
     while count<@maxSheetsVisible
       div = @sheetDivs[count]
       if not @sheets[index]
@@ -470,17 +471,19 @@ class Notepad
     $('#note-dialog-collapsed').attr 'checked': if note.collapsed then yes else no
     colors = $('#note-dialog-colors').empty()
     widths = $('#note-dialog-widths').empty()
+    currentColor = note.color ? (@lastColor ? 0)
+    currentWidth = note.width ? (@lastWidth ? @noteWidths[0])
     for color in [0...@colors]
-      a = $(document.createElement('a')).addClass('btn').attr(href: '#').data('index', color)
+      a = $(document.createElement('a')).addClass('btn btn-small').attr(href: '#').data('index', color)
       a.appendTo colors
-      if (note.color ? 0) is color
+      if currentColor is color
         a.addClass 'active'
       adiv = $(document.createElement('div')).addClass('note-color-button note-color'+color).html('&nbsp;').appendTo(a)
     colors.button()
     for width in @noteWidths
       a = $(document.createElement('a')).addClass('btn').attr(href: '#').data('width', width)
       a.text("#{width}%").appendTo widths
-      if (note.width ? @noteWidths[0]) is width
+      if currentWidth is width
         a.addClass 'active'
     widths.button()
     $('#do-remove-note-dialog').unbind('click').bind 'click', (e) =>
@@ -507,6 +510,8 @@ class Notepad
         $('#note-dialog').modal('hide')
         if handler then handler(note)
       if not note.id
+        @lastColor = note.color
+        @lastWidth = note.width
         note.sheet_id = sheet.id
         @app.manager.storage.create 'notes', note, _handler
       else
@@ -516,13 +521,14 @@ class Notepad
     @selectedNotes = {}
     @divContent.find('.note-selected').removeClass('note-selected')
 
+  preciseEm: (value) ->
+    return Math.floor(value*100/@zoomFactor)/100
+
   loadNotes: (sheet, parent) ->
-    preciseEm = (value) =>
-      return Math.floor(value*10/@zoomFactor)/10
     loadNote = (note) =>
       # log 'loadNote', note
       div = $(document.createElement('div')).addClass('note').appendTo(parent)
-      div.attr draggable: yes
+      div.attr draggable: yes, id: 'note'+note.id
       div.bind 'click', (e) =>
         e.preventDefault()
         if e.ctrlKey
@@ -550,9 +556,9 @@ class Notepad
         e.stopPropagation()
       div.addClass('note-color0 note-color'+(note.color ? 0))
       width = note.width ? @noteWidths[0]
-      width = preciseEm width
-      x = preciseEm(note.x ? 0)
-      y = preciseEm(note.y ? 0)
+      width = @preciseEm width
+      x = @preciseEm(note.x ? 0)
+      y = @preciseEm(note.y ? 0)
       div.css width: "#{width}em", left: "#{x}em", top: "#{y}em"
       if note.collapsed
         div.addClass('note-collapsed')
@@ -570,12 +576,36 @@ class Notepad
       parent.empty()
       for item in arr
         loadNote item
+        @notes.push item
   noteWidths: [50, 75, 90, 125]
   zoomFactor: 5
-  colors: 5
+  colors: 8
   gridStep: 6
 
   loadSheet: (index, div) ->
+    clearSelector = () =>
+      if @selectorDiv
+        @selectorDiv.remove()
+        @selectorDiv = null
+    clearSelector()
+    inRectangle = (x1, y1, x2, y2, x3, y3, x4, y4) ->
+      x_overlap = Math.min(x2,x4) - Math.max(x1,x3)
+      y_overlap = Math.min(y2,y4) - Math.max(y1,y3)
+      return if x_overlap>=0 and y_overlap>=0 then yes else no
+
+
+    notesInRectangle = (x1, y1, x2, y2) =>
+      if x1>x2 then [x1, x2] = [x2, x1]
+      if y1>y2 then [y1, y2] = [y2, y1]
+      notes = []
+      for note in (@notes ? [])
+        noteDiv = divContent.children('#note'+note.id)
+        if noteDiv.size() isnt 1 then continue
+        [width, height] = offsetToCoordinates(noteDiv.outerWidth(), noteDiv.outerHeight())
+        if inRectangle(x1, y1, x2, y2, note.x, note.y, note.x+width, note.y+height)
+          notes.push note
+      [{x: x1, y: y1, width: x2-x1, height: y2-y1}, notes]
+
     offsetToCoordinates = (x, y) ->
       [Math.floor(x/divContent.width()*template.width), Math.floor(y/divContent.height()*template.height)]
     sheet = @sheets[index]
@@ -591,6 +621,46 @@ class Notepad
       @showSheetDialog sheet, =>
         @reloadSheets()
     divContent.unbind()
+    divContent.bind 'mousedown', (e) =>
+      offset = @app.dragGetOffset e, divContent
+      [x, y] = offsetToCoordinates offset.left, offset.top
+      [coords, notes] = notesInRectangle(x, y, x, y)
+      # log 'mousedown', coords, notes
+      if notes.length is 0 and e.ctrlKey
+        @selectorDiv = $(document.createElement('div')).appendTo(divContent).addClass('notes-selector')
+        @selectorDiv.css left: ''+@preciseEm(x)+'em', top: ''+@preciseEm(y)+'em'
+        @selectorX = x
+        @selectorY = y
+        @selectorIndex = index
+        return no
+    divContent.bind 'mouseup', (e) =>
+      if not e.ctrlKey and @selectorDiv
+        clearSelector()
+        return
+      if @selectorDiv and @selectorIndex is index
+        offset = @app.dragGetOffset e, divContent
+        [x, y] = offsetToCoordinates offset.left, offset.top
+        [coords, notes] = notesInRectangle(x, y, @selectorX, @selectorY)
+        for note in notes
+          if @selectedNotes[note.id]
+            delete @selectedNotes[note.id]
+            divContent.children('#note'+note.id).removeClass('note-selected')
+          else
+            @selectedNotes[note.id] = yes
+            divContent.children('#note'+note.id).addClass('note-selected')
+        clearSelector()
+
+    divContent.bind 'mousemove', (e) =>
+      if not e.ctrlKey and @selectorDiv
+        clearSelector()
+        return
+      if @selectorDiv and @selectorIndex is index
+        offset = @app.dragGetOffset e, divContent
+        [x, y] = offsetToCoordinates offset.left, offset.top
+        # log 'Before notes', x, y, @selectorX, @selectorY, e
+        [coords, notes] = notesInRectangle(x, y, @selectorX, @selectorY)
+        # log 'notesInRectangle', coords, notes
+        @selectorDiv.css left: ''+@preciseEm(coords.x)+'em', top: ''+@preciseEm(coords.y)+'em', width: ''+@preciseEm(coords.width)+'em', height: ''+@preciseEm(coords.height)+'em'
     divContent.bind 'dblclick', (e) =>
       [x, y] = offsetToCoordinates e.offsetX, e.offsetY
       @showNotesDialog sheet, {x: x, y: y}, () =>
@@ -621,6 +691,10 @@ class Notepad
           @app.manager.batch config, (err, arr) =>
             if err then return @app.showError err
             updates = []
+            arr = arr.sort (a, b) ->
+              if a.y<b.y then return -1
+              if a.y>b.y then return 1
+              return a.x-b.x
             for note in arr
               note.sheet_id = sheet.id
               note.x = x
