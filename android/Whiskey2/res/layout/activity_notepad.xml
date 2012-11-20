@@ -1,19 +1,23 @@
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context=".NotepadActivity" >
 
-    <org.kvj.whiskey2.widgets.LockableScrollView
-        android:id="@+id/lockableScrollView1"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent" >
+    <org.kvj.whiskey2.widgets.ListPageSelector
+        android:id="@+id/notepad_sheets"
+        android:layout_width="50dp"
+        android:layout_height="match_parent"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentTop="true">
+    </org.kvj.whiskey2.widgets.ListPageSelector>
 
-        <org.kvj.whiskey2.widgets.PageSelector
-            android:id="@+id/pageSelector1"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content" >
-        </org.kvj.whiskey2.widgets.PageSelector>
-    </org.kvj.whiskey2.widgets.LockableScrollView>
+    <FrameLayout
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentRight="true"
+        android:layout_toRightOf="@+id/notepad_sheets" >
+    </FrameLayout>
 
-</FrameLayout>
+</RelativeLayout>

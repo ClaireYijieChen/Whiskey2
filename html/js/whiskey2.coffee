@@ -314,7 +314,7 @@ class Notepad
   zoomInOut: (direction = 1) ->
     if direction<0 and @zoom<=@zoomStep then return
     @zoom += direction*@zoomStep
-    @divContent.css 'transform': "scale(#{@zoom}, #{@zoom})"
+    @divContent.css 'font-size': "#{@zoom}em"
 
   showSheetDialog: (sheet, handler) ->
     $('#sheet-dialog-name').val(sheet.title ? '')

@@ -490,7 +490,7 @@
       if (direction < 0 && this.zoom <= this.zoomStep) return;
       this.zoom += direction * this.zoomStep;
       return this.divContent.css({
-        'transform': "scale(" + this.zoom + ", " + this.zoom + ")"
+        'font-size': "" + this.zoom + "em"
       });
     };
 
