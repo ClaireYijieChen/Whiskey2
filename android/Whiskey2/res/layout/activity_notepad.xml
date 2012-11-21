@@ -18,6 +18,13 @@
         android:layout_alignParentTop="true"
         android:layout_alignParentRight="true"
         android:layout_toRightOf="@+id/notepad_sheets" >
+
+        <org.kvj.whiskey2.widgets.MainSurface
+            android:id="@+id/notepad_main_surface"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" >
+        </org.kvj.whiskey2.widgets.MainSurface>
+
     </FrameLayout>
 
 </RelativeLayout>
