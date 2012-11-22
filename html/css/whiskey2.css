@@ -119,6 +119,8 @@
   white-space: normal;
   box-sizing: border-box;
   box-shadow: 1px 1px 2px #aaaaaa;
+  font-size: 1em;
+  line-height: 1.4em;
 }
 
 .note:hover {
@@ -126,7 +128,7 @@
 }
 
 .note-collapsed {
-  height: 2em;
+  height: 1.8em;
   overflow: hidden;
   border-bottom-style: dashed;
   border-bottom-width: 1px;
