@@ -6,6 +6,7 @@ import java.util.List;
 import org.kvj.lima1.sync.PJSONObject;
 import org.kvj.whiskey2.R;
 import org.kvj.whiskey2.data.DataController;
+import org.kvj.whiskey2.widgets.ListPageSelector;
 
 import android.content.Context;
 import android.database.DataSetObserver;
@@ -18,9 +19,17 @@ import android.widget.TextView;
 
 public class SheetsAdapter implements ListAdapter {
 
+	private ListPageSelector selector = null;
+
+	public SheetsAdapter(ListPageSelector selector) {
+		this.selector = selector;
+		selector.setAdapter(this);
+	}
+
 	public static class SheetInfo {
-		long id;
-		String title;
+		public long id;
+		public String title;
+		public Long templateID;
 	}
 
 	List<SheetInfo> data = new ArrayList<SheetsAdapter.SheetInfo>();
@@ -120,6 +129,7 @@ public class SheetsAdapter implements ListAdapter {
 				data.addAll(newData);
 				if (null != observer) { // Have observer
 					observer.onChanged();
+					selector.notifyPagesChanged();
 				}
 			}
 		};

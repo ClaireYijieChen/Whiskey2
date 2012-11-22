@@ -1,5 +1,8 @@
 package org.kvj.whiskey2.widgets;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.kvj.whiskey2.data.DataController;
 import org.kvj.whiskey2.widgets.adapters.SheetsAdapter;
 
@@ -14,23 +17,33 @@ import android.widget.RelativeLayout;
 
 public class ListPageSelector extends ListView {
 
+	public static interface PagesSelectorListener {
+		public void onPagesChanged();
+
+		public void onPageSelected(int position, long id);
+	}
+
+	private List<PagesSelectorListener> listeners = new ArrayList<ListPageSelector.PagesSelectorListener>();
+
 	private static final String TAG = "PageSelector";
-	SheetsAdapter adapter = null;
-	boolean collapsed = false;
+	public SheetsAdapter adapter = null;
+	public boolean collapsed = false;
 	boolean collapsible = true;
 	static int collapsedWidth = 50;
 	static int expandedWidth = 150;
 	float density = 1;
 
+	private DataController controller = null;
+
 	public ListPageSelector(Context context, AttributeSet attrs) {
 		super(context, attrs);
-		adapter = new SheetsAdapter();
-		setAdapter(adapter);
+		adapter = new SheetsAdapter(this);
 		setOnItemClickListener(new OnItemClickListener() {
 
 			@Override
-			public void onItemClick(AdapterView<?> arg0, View arg1, int arg2, long arg3) {
+			public void onItemClick(AdapterView<?> arg0, View arg1, int index, long id) {
 				collapseExpand(true);
+				notifyPageSelected(index, id);
 			}
 		});
 	}
@@ -41,7 +54,8 @@ public class ListPageSelector extends ListView {
 		density = getContext().getResources().getDisplayMetrics().density;
 	}
 
-	public void update(DataController controller, long notepadID) {
+	public void update(DataController controller, long notepadID, Long sheetID) {
+		this.controller = controller;
 		adapter.update(controller, notepadID);
 	}
 
@@ -49,9 +63,9 @@ public class ListPageSelector extends ListView {
 	protected void onFocusChanged(boolean gainFocus, int direction, Rect previouslyFocusedRect) {
 		super.onFocusChanged(gainFocus, direction, previouslyFocusedRect);
 		Log.i(TAG, "Focus changed: " + gainFocus);
-		if (gainFocus) { // Got focus
-			collapseExpand(false);
-		}
+		// if (gainFocus) { // Got focus
+		collapseExpand(!gainFocus);
+		// }
 	}
 
 	private void collapseExpand(boolean collapse) {
@@ -66,6 +80,29 @@ public class ListPageSelector extends ListView {
 			params.width = (int) (expandedWidth * density);
 		}
 		getParent().requestLayout();
+	}
+
+	public void addListener(PagesSelectorListener listener) {
+		if (!listeners.contains(listener)) { // New
+			listeners.add(listener);
+		}
+	}
+
+	public void notifyPagesChanged() {
+		Log.i(TAG, "Notify pages changed: " + adapter.getCount() + ", " + listeners.size());
+		for (PagesSelectorListener l : listeners) { // Iterate and notify
+			l.onPagesChanged();
+		}
+	}
+
+	public void notifyPageSelected(int position, long id) {
+		for (PagesSelectorListener l : listeners) { // Iterate and notify
+			l.onPageSelected(position, id);
+		}
+	}
+
+	public DataController getController() {
+		return controller;
 	}
 
 }

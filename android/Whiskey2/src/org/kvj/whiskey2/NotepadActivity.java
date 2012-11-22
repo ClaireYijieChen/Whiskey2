@@ -6,13 +6,16 @@ import org.kvj.bravo7.SuperActivity;
 import org.kvj.whiskey2.data.DataController;
 import org.kvj.whiskey2.svc.DataService;
 import org.kvj.whiskey2.widgets.ListPageSelector;
+import org.kvj.whiskey2.widgets.ListPageSelector.PagesSelectorListener;
 import org.kvj.whiskey2.widgets.adapters.NotebookListAdapter;
 import org.kvj.whiskey2.widgets.adapters.NotebookListAdapter.NotebookInfo;
+import org.kvj.whiskey2.widgets.adapters.PagesPagerAdapter;
 
 import android.app.ProgressDialog;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.support.v4.view.ViewPager;
 import android.util.Log;
 
 import com.actionbarsherlock.app.ActionBar;
@@ -28,6 +31,10 @@ public class NotepadActivity extends SherlockFragmentActivity implements Control
 	private DataController controller = null;
 	NotebookListAdapter notebookListAdapter = null;
 	ListPageSelector sheetSelector = null;
+	ViewPager pager = null;
+	PagesPagerAdapter pagerAdapter = null;
+	private long selectedNotepadID = -1;
+	private Long sheetID = null;
 
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
@@ -41,15 +48,48 @@ public class NotepadActivity extends SherlockFragmentActivity implements Control
 		case R.id.menu_sync: // Run sync
 			sync();
 			break;
+		case R.id.menu_reload: // Reload selected notepad
+			reloadNotepad(selectedNotepadID);
+			break;
 		}
+
 		return true;
+	}
+
+	private void reloadNotepad(long id) {
+		for (int i = 0; i < notebookListAdapter.getCount(); i++) { // Search
+			NotebookInfo info = notebookListAdapter.getItem(i);
+			if (id == info.id) { // Found
+				notepadSelected(info);
+				return;
+			}
+		}
+		SuperActivity.notifyUser(this, "Not selected");
 	}
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
+		startService(new Intent(this, DataService.class));
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_notepad);
-		startService(new Intent(this, DataService.class));
+		Bundle data = SuperActivity.getData(this, savedInstanceState);
+		if (data.containsKey("sheet")) { // Found sheet
+			sheetID = data.getLong("sheet");
+		}
+		pager = (ViewPager) findViewById(R.id.notepad_pager);
+		sheetSelector = (ListPageSelector) findViewById(R.id.notepad_sheets);
+		pagerAdapter = new PagesPagerAdapter(getSupportFragmentManager(), pager);
+		sheetSelector.addListener(new PagesSelectorListener() {
+
+			@Override
+			public void onPagesChanged() {
+			}
+
+			@Override
+			public void onPageSelected(int position, long id) {
+				pager.requestFocus();
+			}
+		});
 		conn = new ControllerConnector<Whiskey2App, DataController, DataService>(this, this);
 		getSupportActionBar().setNavigationMode(ActionBar.NAVIGATION_MODE_LIST);
 		notebookListAdapter = new NotebookListAdapter(this);
@@ -62,12 +102,12 @@ public class NotepadActivity extends SherlockFragmentActivity implements Control
 				return true;
 			}
 		});
-		sheetSelector = (ListPageSelector) findViewById(R.id.notepad_sheets);
 	}
 
 	private void notepadSelected(NotebookInfo info) {
 		Log.i(TAG, "Notepad selected: " + info);
-		sheetSelector.update(controller, info.id);
+		selectedNotepadID = info.id;
+		sheetSelector.update(controller, info.id, sheetID);
 	}
 
 	private void sync() {
@@ -85,10 +125,19 @@ public class NotepadActivity extends SherlockFragmentActivity implements Control
 					SuperActivity.notifyUser(getApplicationContext(), result);
 				}
 				progress.dismiss();
+				reloadNotepad(selectedNotepadID);
 			}
 
 		};
 		task.execute();
+	}
+
+	@Override
+	protected void onSaveInstanceState(Bundle outState) {
+		super.onSaveInstanceState(outState);
+		if (pager.getCurrentItem() != -1) { // Have item
+			outState.putLong("sheet", sheetSelector.adapter.getItem(pager.getCurrentItem()).id);
+		}
 	}
 
 	@Override
@@ -107,8 +156,19 @@ public class NotepadActivity extends SherlockFragmentActivity implements Control
 	public void onController(DataController controller) {
 		if (null == this.controller) { // Just connected
 			this.controller = controller;
+			pagerAdapter.setSelector(sheetSelector);
 			notebookListAdapter.update(controller);
 		}
+	}
+
+	@Override
+	public void onBackPressed() {
+		if (sheetSelector.collapsed) { // Expand
+			if (sheetSelector.requestFocus()) { // Focused
+				return;
+			}
+		}
+		super.onBackPressed();
 	}
 
 }

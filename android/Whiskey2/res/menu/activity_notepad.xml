@@ -5,4 +5,8 @@
         android:showAsAction="ifRoom"
         android:title="Sync"/>
 
+    <item
+        android:id="@+id/menu_reload"
+        android:showAsAction="ifRoom"
+        android:title="Reload"/>
 </menu>
