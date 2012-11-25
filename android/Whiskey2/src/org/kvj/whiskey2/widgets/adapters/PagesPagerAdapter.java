@@ -8,12 +8,14 @@ import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentStatePagerAdapter;
 import android.support.v4.view.ViewPager;
+import android.util.Log;
 
 public class PagesPagerAdapter extends FragmentStatePagerAdapter implements PagesSelectorListener {
 
 	private static final String TAG = "PagesAdapter";
 	private ListPageSelector selector = null;
 	private ViewPager pager = null;
+	private long notepadID = -1;
 
 	public PagesPagerAdapter(FragmentManager fm, ViewPager pager) {
 		super(fm);
@@ -23,8 +25,8 @@ public class PagesPagerAdapter extends FragmentStatePagerAdapter implements Page
 
 	@Override
 	public Fragment getItem(int index) {
-		// Log.i(TAG, "Creating page: " + index);
-		return new PagerItemFragment(index);
+		Log.i(TAG, "Creating page: " + index);
+		return new PagerItemFragment(index, notepadID, selector);
 	}
 
 	@Override
@@ -34,13 +36,15 @@ public class PagesPagerAdapter extends FragmentStatePagerAdapter implements Page
 	}
 
 	@Override
-	public void onPagesChanged() {
+	public void onPagesChanged(long notepadID) {
+		Log.i(TAG, "Pages changed");
+		this.notepadID = notepadID;
 		notifyDataSetChanged();
 	}
 
 	@Override
 	public void onPageSelected(int position, long id) {
-		pager.setCurrentItem(position, true);
+		pager.setCurrentItem(position, false);
 	}
 
 	public ListPageSelector getSelector() {

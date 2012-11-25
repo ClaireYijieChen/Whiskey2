@@ -5,13 +5,18 @@ import java.util.List;
 
 import org.json.JSONException;
 import org.kvj.lima1.sync.PJSONObject;
+import org.kvj.whiskey2.R;
 import org.kvj.whiskey2.data.DataController;
 import org.kvj.whiskey2.widgets.adapters.NotebookListAdapter.NotebookInfo;
 
 import android.content.Context;
 import android.os.AsyncTask;
 import android.util.Log;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
+import android.widget.TextView;
 
 public class NotebookListAdapter extends ArrayAdapter<NotebookInfo> {
 
@@ -19,6 +24,10 @@ public class NotebookListAdapter extends ArrayAdapter<NotebookInfo> {
 
 	public NotebookListAdapter(Context context) {
 		super(context, android.R.layout.simple_spinner_item);
+	}
+
+	public void onLoaded() {
+
 	}
 
 	public void update(final DataController controller) {
@@ -47,6 +56,7 @@ public class NotebookListAdapter extends ArrayAdapter<NotebookInfo> {
 			@Override
 			protected void onPostExecute(java.util.List<NotebookInfo> result) {
 				addAll(result);
+				onLoaded();
 			};
 		}.execute();
 	}
@@ -60,6 +70,16 @@ public class NotebookListAdapter extends ArrayAdapter<NotebookInfo> {
 			return title;
 		}
 
+	}
+
+	@Override
+	public View getDropDownView(int position, View convertView, ViewGroup parent) {
+		LayoutInflater inflater = (LayoutInflater) parent.getContext().getSystemService(
+				Context.LAYOUT_INFLATER_SERVICE);
+		convertView = inflater.inflate(R.layout.spinner_item, parent, false);
+		TextView textView = (TextView) convertView;
+		textView.setText(getItem(position).title);
+		return convertView;
 	}
 
 }

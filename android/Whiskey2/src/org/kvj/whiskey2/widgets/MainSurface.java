@@ -9,6 +9,8 @@ import org.kvj.whiskey2.widgets.adapters.SheetsAdapter.SheetInfo;
 
 import android.content.Context;
 import android.os.AsyncTask;
+import android.support.v4.app.DialogFragment;
+import android.support.v4.app.FragmentActivity;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.TypedValue;
@@ -21,11 +23,11 @@ import android.widget.TextView;
 public class MainSurface extends RelativeLayout {
 
 	private static final String TAG = "MainSurface";
-	public static final int PAGE_MARGIN = 20;
+	public static final int PAGE_MARGIN = 10;
 	public static final int PAGES_GAP = 10;
 	public static final int TEXT_PADDING = 1;
 	private static final float TEXT_SIZE = 5;
-	private static final float COLLPASED_HEIGHT = 8;
+	private static final float COLLPASED_HEIGHT = (float) 8.5;
 
 	private boolean layoutCreated = false;
 	private float density = 1;
@@ -34,6 +36,7 @@ public class MainSurface extends RelativeLayout {
 	ViewGroup parent = null;
 	private ListPageSelector selector = null;
 	private int index = -1;
+	private FragmentActivity activity;
 
 	public MainSurface(Context context, AttributeSet attrs) {
 		super(context, attrs);
@@ -42,9 +45,10 @@ public class MainSurface extends RelativeLayout {
 		pagesGap = density * PAGES_GAP;
 	}
 
-	public void setController(int index, ListPageSelector selector) {
+	public void setController(int index, ListPageSelector selector, FragmentActivity fragmentActivity) {
 		this.index = index;
 		this.selector = selector;
+		this.activity = fragmentActivity;
 	}
 
 	@Override
@@ -64,7 +68,8 @@ public class MainSurface extends RelativeLayout {
 	@Override
 	protected void onAttachedToWindow() {
 		super.onAttachedToWindow();
-		Log.i(TAG, "attached to window - : " + getWidth() + ", " + getHeight());
+		// Log.i(TAG, "attached to window - : " + getWidth() + ", " +
+		// getHeight());
 		parent = (ViewGroup) getParent();
 	}
 
@@ -150,6 +155,8 @@ public class MainSurface extends RelativeLayout {
 					TextView view = createNoteTextItem(page, info);
 					info.widget = view;
 				}
+				page.notes.clear();
+				page.notes.addAll(result);
 				requestLayout();
 			}
 		};
@@ -219,7 +226,9 @@ public class MainSurface extends RelativeLayout {
 			@Override
 			public boolean onLongClick(View arg0) {
 				Log.i(TAG, "Text long click");
-				return false;
+				DialogFragment fragment = EditorDialogFragment.newInstance(info);
+				fragment.show(activity.getSupportFragmentManager(), "editor");
+				return true;
 			}
 		});
 		textView.setOnClickListener(new OnClickListener() {

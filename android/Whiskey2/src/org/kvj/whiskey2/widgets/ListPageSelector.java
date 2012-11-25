@@ -18,7 +18,7 @@ import android.widget.RelativeLayout;
 public class ListPageSelector extends ListView {
 
 	public static interface PagesSelectorListener {
-		public void onPagesChanged();
+		public void onPagesChanged(long notepadID);
 
 		public void onPageSelected(int position, long id);
 	}
@@ -29,7 +29,7 @@ public class ListPageSelector extends ListView {
 	public SheetsAdapter adapter = null;
 	public boolean collapsed = false;
 	boolean collapsible = true;
-	static int collapsedWidth = 50;
+	static int collapsedWidth = 30;
 	static int expandedWidth = 150;
 	float density = 1;
 
@@ -56,7 +56,7 @@ public class ListPageSelector extends ListView {
 
 	public void update(DataController controller, long notepadID, Long sheetID) {
 		this.controller = controller;
-		adapter.update(controller, notepadID);
+		adapter.update(controller, notepadID, sheetID);
 	}
 
 	@Override
@@ -68,7 +68,7 @@ public class ListPageSelector extends ListView {
 		// }
 	}
 
-	private void collapseExpand(boolean collapse) {
+	public void collapseExpand(boolean collapse) {
 		if (!collapsible) { // Not supported
 			return;
 		}
@@ -88,10 +88,11 @@ public class ListPageSelector extends ListView {
 		}
 	}
 
-	public void notifyPagesChanged() {
-		Log.i(TAG, "Notify pages changed: " + adapter.getCount() + ", " + listeners.size());
+	public void notifyPagesChanged(long notepadID) {
+		// Log.i(TAG, "Notify pages changed: " + adapter.getCount() + ", " +
+		// listeners.size());
 		for (PagesSelectorListener l : listeners) { // Iterate and notify
-			l.onPagesChanged();
+			l.onPagesChanged(notepadID);
 		}
 	}
 

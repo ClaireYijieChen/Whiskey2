@@ -1,6 +1,8 @@
 package org.kvj.whiskey2.data;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 import org.kvj.bravo7.ipc.RemoteServiceConnector;
@@ -8,6 +10,7 @@ import org.kvj.lima1.sync.PJSONObject;
 import org.kvj.lima1.sync.QueryOperator;
 import org.kvj.lima1.sync.SyncService;
 import org.kvj.lima1.sync.SyncServiceInfo;
+import org.kvj.whiskey2.R;
 import org.kvj.whiskey2.Whiskey2App;
 
 import android.content.Intent;
@@ -23,6 +26,10 @@ public class DataController {
 	RemoteServiceConnector<SyncService> connector = null;
 	private TemplateInfo defaultTemplate = new TemplateInfo();
 	final Object connectorLock = new Object();
+	private Integer[] colors = { R.drawable.note0, R.drawable.note0, R.drawable.note0, R.drawable.note0,
+			R.drawable.note0,
+			R.drawable.note0, R.drawable.note0, R.drawable.note0 };
+	private Integer[] widths = { 50, 75, 90, 125 };
 
 	public DataController(Whiskey2App whiskey2App) {
 		this.app = whiskey2App;
@@ -186,9 +193,24 @@ public class DataController {
 				info.collapsible = obj.optBoolean("collapsed", false);
 				result.add(info);
 			}
+			Collections.sort(result, new Comparator<NoteInfo>() {
+
+				@Override
+				public int compare(NoteInfo lhs, NoteInfo rhs) {
+					return lhs.y - rhs.y;
+				}
+			});
 		} catch (Exception e) {
 			Log.e(TAG, "Error getting notebooks:", e);
 		}
 		return result;
+	}
+
+	public Integer[] getColors() {
+		return colors;
+	}
+
+	public Integer[] getWidths() {
+		return widths;
 	}
 }

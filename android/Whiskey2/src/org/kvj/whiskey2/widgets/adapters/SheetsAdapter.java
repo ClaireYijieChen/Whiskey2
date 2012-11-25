@@ -42,7 +42,10 @@ public class SheetsAdapter implements ListAdapter {
 
 	@Override
 	public SheetInfo getItem(int index) {
-		return data.get(index);
+		if (index < getCount()) {
+			return data.get(index);
+		}
+		return null;
 	}
 
 	@Override
@@ -103,7 +106,7 @@ public class SheetsAdapter implements ListAdapter {
 		return true;
 	}
 
-	public void update(final DataController controller, final long notepadID) {
+	public void update(final DataController controller, final long notepadID, final Long sheetID) {
 		final List<SheetInfo> newData = new ArrayList<SheetsAdapter.SheetInfo>();
 		AsyncTask<Void, Void, Void> task = new AsyncTask<Void, Void, Void>() {
 
@@ -129,7 +132,13 @@ public class SheetsAdapter implements ListAdapter {
 				data.addAll(newData);
 				if (null != observer) { // Have observer
 					observer.onChanged();
-					selector.notifyPagesChanged();
+					selector.notifyPagesChanged(notepadID);
+				}
+				for (int i = 0; i < data.size(); i++) {
+					SheetInfo info = data.get(i);
+					if (info.id == sheetID) {
+						selector.notifyPageSelected(i, info.id);
+					}
 				}
 			}
 		};
