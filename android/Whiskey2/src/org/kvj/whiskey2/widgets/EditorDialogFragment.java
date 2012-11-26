@@ -10,15 +10,16 @@ import org.kvj.bravo7.form.impl.widget.SpinnerIntegerAdapter;
 import org.kvj.bravo7.form.impl.widget.TextViewStringAdapter;
 import org.kvj.bravo7.form.impl.widget.TransientAdapter;
 import org.kvj.whiskey2.R;
-import org.kvj.whiskey2.Whiskey2App;
 import org.kvj.whiskey2.data.DataController;
 import org.kvj.whiskey2.data.NoteInfo;
+import org.kvj.whiskey2.data.SheetInfo;
 import org.kvj.whiskey2.widgets.adapters.ColorsSpinnerAdapter;
 import org.kvj.whiskey2.widgets.adapters.WidthsSpinnerAdapter;
 
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -36,15 +37,22 @@ public class EditorDialogFragment extends SherlockDialogFragment {
 	private static final String KEY_WIDTH = "width";
 	private static final String KEY_COLOR = "color";
 	private static final String KEY_TEXT = "text";
+	private static final String KEY_SHEET_ID = "sheet_id";
+	private static final String KEY_X = "x";
+	private static final String KEY_Y = "y";
 
-	public static EditorDialogFragment newInstance(NoteInfo info) {
+	public static EditorDialogFragment newInstance(NoteInfo info, DataController controller) {
 		EditorDialogFragment f = new EditorDialogFragment();
+		f.controller = controller;
 		Bundle args = new Bundle();
 		args.putLong(KEY_ID, info.id);
 		args.putBoolean(KEY_COLLAPSIBLE, info.collapsible);
 		args.putInt(KEY_WIDTH, info.width);
 		args.putInt(KEY_COLOR, info.color);
 		args.putString(KEY_TEXT, info.text);
+		args.putInt(KEY_X, info.x);
+		args.putInt(KEY_Y, info.y);
+		args.putLong(KEY_SHEET_ID, info.sheetID);
 		f.setArguments(args);
 		return f;
 	}
@@ -54,7 +62,6 @@ public class EditorDialogFragment extends SherlockDialogFragment {
 
 	public EditorDialogFragment() {
 		super();
-		this.controller = Whiskey2App.getInstance().getBean(DataController.class);
 	}
 
 	@Override
@@ -71,6 +78,9 @@ public class EditorDialogFragment extends SherlockDialogFragment {
 		View view = inflater.inflate(R.layout.dialog_editor, null);
 		formController = new FormController(view);
 		formController.add(new TransientAdapter<Long>(new LongBundleAdapter(), -1L), KEY_ID);
+		formController.add(new TransientAdapter<Long>(new LongBundleAdapter(), -1L), KEY_SHEET_ID);
+		formController.add(new TransientAdapter<Integer>(new IntegerBundleAdapter(), 0), KEY_X);
+		formController.add(new TransientAdapter<Integer>(new IntegerBundleAdapter(), 0), KEY_Y);
 		formController.add(new TextViewStringAdapter(R.id.edit_text, ""), KEY_TEXT);
 		formController.add(new CheckboxIntegerAdapter(R.id.edit_collapsible, false), KEY_COLLAPSIBLE);
 		final WidthsSpinnerAdapter widthsAdapter = new WidthsSpinnerAdapter(controller.getWidths());
@@ -128,21 +138,59 @@ public class EditorDialogFragment extends SherlockDialogFragment {
 	}
 
 	protected void onRemoveClick() {
-		// TODO Auto-generated method stub
-
+		NoteInfo info = controller.getNote(formController.getValue(KEY_ID, Long.class));
+		if (null == info) { // Not found
+			SuperActivity.notifyUser(getActivity(), "Note not found");
+			return;
+		}
+		if (controller.removeNote(info)) { // Removed
+			dismiss();
+		} else {
+			SuperActivity.notifyUser(getActivity(), "Error removing note");
+			return;
+		}
 	}
 
 	protected void onSaveClick() {
-		// TODO Auto-generated method stub
-
+		String text = formController.getValue(KEY_TEXT, String.class).trim();
+		if (TextUtils.isEmpty(text)) { // Empty text
+			SuperActivity.notifyUser(getActivity(), "Text is empty");
+			return;
+		}
+		NoteInfo info = new NoteInfo();
+		if (-1 == formController.getValue(KEY_ID, Long.class)) { // New note
+			SheetInfo sheet = controller.getSheet(formController.getValue(KEY_SHEET_ID, Long.class));
+			if (null == sheet) { // Invalid data
+				SuperActivity.notifyUser(getActivity(), "Page not found");
+				return;
+			}
+			info.sheetID = sheet.id;
+			info.x = formController.getValue(KEY_X, Integer.class);
+			info.y = formController.getValue(KEY_Y, Integer.class);
+		} else {
+			// Search for existing note
+			info = controller.getNote(formController.getValue(KEY_ID, Long.class));
+			if (null == info) { // Not found
+				SuperActivity.notifyUser(getActivity(), "Note not found");
+				return;
+			}
+		}
+		info.collapsible = formController.getValue(KEY_COLLAPSIBLE, Boolean.class);
+		info.color = formController.getValue(KEY_COLOR, Integer.class);
+		info.width = formController.getValue(KEY_WIDTH, Integer.class);
+		info.text = text;
+		if (controller.saveNote(info)) { // Saved
+			dismiss();
+		} else {
+			SuperActivity.notifyUser(getActivity(), "Error saving note");
+			return;
+		}
 	}
 
 	private void onCancelClick() {
 		if (formController.changed()) {
-			SuperActivity.showQuestionDialog(getActivity(),
-					"Dismiss changes?",
-					"There are unsaved changes. Are you sure want to continue?",
-					new Runnable() {
+			SuperActivity.showQuestionDialog(getActivity(), "Dismiss changes?",
+					"There are unsaved changes. Are you sure want to continue?", new Runnable() {
 
 						@Override
 						public void run() {

@@ -12,6 +12,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Paint.Style;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.View;
 
 public class PageSurface extends View {
@@ -31,6 +32,8 @@ public class PageSurface extends View {
 	static int shadowGap = 2;
 	static int borderSize = 2;
 	List<NoteInfo> notes = new ArrayList<NoteInfo>();
+	private float lastDownX = 0;
+	private float lastDownY = 0;
 
 	public PageSurface(Context context) {
 		super(context);
@@ -68,6 +71,16 @@ public class PageSurface extends View {
 	}
 
 	@Override
+	public boolean onTouchEvent(MotionEvent event) {
+		if (event.getAction() == MotionEvent.ACTION_DOWN) {
+			// Record coordinates
+			lastDownX = event.getX();
+			lastDownY = event.getY();
+		}
+		return super.onTouchEvent(event);
+	}
+
+	@Override
 	protected void onDraw(Canvas canvas) {
 		int width = getWidth();
 		int height = getHeight();
@@ -88,5 +101,13 @@ public class PageSurface extends View {
 		paint.setTextSize(TITLE_FONT_SIZE / zoomFactor);
 		paint.setStrokeWidth(density * FONT_WIDTH);
 		canvas.drawText(title, TITLE_LEFT / zoomFactor, TITLE_TOP / zoomFactor, paint);
+	}
+
+	public float getLastDownX() {
+		return lastDownX;
+	}
+
+	public float getLastDownY() {
+		return lastDownY;
 	}
 }

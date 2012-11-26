@@ -3,9 +3,9 @@ package org.kvj.whiskey2.widgets.adapters;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.kvj.lima1.sync.PJSONObject;
 import org.kvj.whiskey2.R;
 import org.kvj.whiskey2.data.DataController;
+import org.kvj.whiskey2.data.SheetInfo;
 import org.kvj.whiskey2.widgets.ListPageSelector;
 
 import android.content.Context;
@@ -26,14 +26,9 @@ public class SheetsAdapter implements ListAdapter {
 		selector.setAdapter(this);
 	}
 
-	public static class SheetInfo {
-		public long id;
-		public String title;
-		public Long templateID;
-	}
-
-	List<SheetInfo> data = new ArrayList<SheetsAdapter.SheetInfo>();
+	List<SheetInfo> data = new ArrayList<SheetInfo>();
 	private DataSetObserver observer = null;
+	private DataController controller = null;
 
 	@Override
 	public int getCount() {
@@ -106,22 +101,17 @@ public class SheetsAdapter implements ListAdapter {
 		return true;
 	}
 
-	public void update(final DataController controller, final long notepadID, final Long sheetID) {
-		final List<SheetInfo> newData = new ArrayList<SheetsAdapter.SheetInfo>();
+	public void update(final DataController controller, final long notepadID, final Runnable finishCallback) {
+		this.controller = controller;
+		final List<SheetInfo> newData = new ArrayList<SheetInfo>();
 		AsyncTask<Void, Void, Void> task = new AsyncTask<Void, Void, Void>() {
 
 			@Override
 			protected Void doInBackground(Void... params) {
 				try { //
-					List<PJSONObject> sheets = controller.getSheets(notepadID);
-					for (PJSONObject obj : sheets) { // Create info
-						SheetInfo info = new SheetInfo();
-						info.id = obj.getLong("id");
-						info.title = obj.getString("title");
-						newData.add(info);
-					}
+					List<SheetInfo> sheets = controller.getSheets(notepadID);
+					newData.addAll(sheets);
 				} catch (Exception e) {
-					// TODO: handle exception
 				}
 				return null;
 			}
@@ -132,17 +122,15 @@ public class SheetsAdapter implements ListAdapter {
 				data.addAll(newData);
 				if (null != observer) { // Have observer
 					observer.onChanged();
-					selector.notifyPagesChanged(notepadID);
-				}
-				for (int i = 0; i < data.size(); i++) {
-					SheetInfo info = data.get(i);
-					if (info.id == sheetID) {
-						selector.notifyPageSelected(i, info.id);
-					}
+					finishCallback.run();
 				}
 			}
 		};
 		task.execute();
+	}
+
+	public DataController getController() {
+		return controller;
 	}
 
 }

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<color name="note0_bg">#FFEFFAB4</color>    
+	<color name="note0_br">#FFAFBA74</color>    
+	<color name="note1_bg">#FFD1F2A5</color>    
+	<color name="note1_br">#FF91C275</color>    
+	<color name="note2_bg">#FFFFC48C</color>    
+	<color name="note2_br">#FFCF844C</color>    
+	<color name="note3_bg">#FFFF9F80</color>    
+	<color name="note3_br">#FFBF5F40</color>    
+	<color name="note4_bg">#FFF56991</color>    
+	<color name="note4_br">#FFB52951</color>    
+	<color name="note5_bg">#FFFF9E9D</color>    
+	<color name="note5_br">#FFBF5E5D</color>    
+	<color name="note6_bg">#FFFFF7BD</color>    
+	<color name="note6_br">#FFBFB77D</color>    
+	<color name="note7_bg">#FFB9D7D9</color>    
+	<color name="note7_br">#FF799799</color>
+	<color name="note_focused_br">#ff33b5e5</color>
+	<dimen name="note_br_size">1dp</dimen>
+	<dimen name="note_br_focused_size">2dp</dimen>
+			    
+</resources>

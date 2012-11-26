@@ -26,11 +26,7 @@ public class NotebookListAdapter extends ArrayAdapter<NotebookInfo> {
 		super(context, android.R.layout.simple_spinner_item);
 	}
 
-	public void onLoaded() {
-
-	}
-
-	public void update(final DataController controller) {
+	public void update(final DataController controller, final Runnable finishCallback) {
 		clear();
 		new AsyncTask<Void, Void, List<NotebookInfo>>() {
 
@@ -56,7 +52,7 @@ public class NotebookListAdapter extends ArrayAdapter<NotebookInfo> {
 			@Override
 			protected void onPostExecute(java.util.List<NotebookInfo> result) {
 				addAll(result);
-				onLoaded();
+				finishCallback.run();
 			};
 		}.execute();
 	}
@@ -74,8 +70,8 @@ public class NotebookListAdapter extends ArrayAdapter<NotebookInfo> {
 
 	@Override
 	public View getDropDownView(int position, View convertView, ViewGroup parent) {
-		LayoutInflater inflater = (LayoutInflater) parent.getContext().getSystemService(
-				Context.LAYOUT_INFLATER_SERVICE);
+		LayoutInflater inflater = (LayoutInflater) parent.getContext()
+				.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
 		convertView = inflater.inflate(R.layout.spinner_item, parent, false);
 		TextView textView = (TextView) convertView;
 		textView.setText(getItem(position).title);

@@ -4,8 +4,10 @@ import java.util.List;
 
 import org.kvj.whiskey2.R;
 import org.kvj.whiskey2.data.NoteInfo;
+import org.kvj.whiskey2.data.SheetInfo;
 import org.kvj.whiskey2.data.TemplateInfo;
-import org.kvj.whiskey2.widgets.adapters.SheetsAdapter.SheetInfo;
+import org.kvj.whiskey2.widgets.adapters.SheetsAdapter;
+import org.kvj.whiskey2.widgets.v11.PageDnDDecorator;
 
 import android.content.Context;
 import android.os.AsyncTask;
@@ -15,8 +17,10 @@ import android.util.AttributeSet;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.KeyEvent;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageButton;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
@@ -34,20 +38,23 @@ public class MainSurface extends RelativeLayout {
 	private float pageMargin;
 	private float pagesGap;
 	ViewGroup parent = null;
-	private ListPageSelector selector = null;
+	private SheetsAdapter adapter = null;
 	private int index = -1;
 	private FragmentActivity activity;
+	private ViewGroup toolbar = null;
+	private LayoutInflater inflater = null;
 
 	public MainSurface(Context context, AttributeSet attrs) {
 		super(context, attrs);
+		inflater = (LayoutInflater) getContext().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
 		density = getContext().getResources().getDisplayMetrics().density;
 		pageMargin = density * PAGE_MARGIN;
 		pagesGap = density * PAGES_GAP;
 	}
 
-	public void setController(int index, ListPageSelector selector, FragmentActivity fragmentActivity) {
+	public void setController(int index, SheetsAdapter adapter, FragmentActivity fragmentActivity) {
 		this.index = index;
-		this.selector = selector;
+		this.adapter = adapter;
 		this.activity = fragmentActivity;
 	}
 
@@ -75,7 +82,8 @@ public class MainSurface extends RelativeLayout {
 
 	private void createLayout(int width, int height) {
 		layoutCreated = true;
-		TemplateInfo template = selector.getController().getTemplate(0);
+		removeAllViews();
+		TemplateInfo template = adapter.getController().getTemplate(0);
 		// Log.i(TAG, "create layout: " + width + "x" + height);
 		int pagesDisplayed = 1;
 		float pageHeight = height - 2 * pageMargin;
@@ -107,7 +115,7 @@ public class MainSurface extends RelativeLayout {
 		}
 		RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams((int) pageWidth, (int) pageHeight);
 		final PageSurface page = new PageSurface(getContext());
-		page.title = selector.adapter.getItem(index).title;
+		page.title = adapter.getItem(index).title;
 		page.marginLeft = left;
 		page.index = index;
 		page.marginTop = top;
@@ -124,28 +132,54 @@ public class MainSurface extends RelativeLayout {
 				page.requestFocus();
 			}
 		});
+		// requestLayout();
+		refresh(page);
+		toolbar = (ViewGroup) inflater.inflate(R.layout.float_note_toolbar, this, false);
+		addToolbarButton(R.drawable.float_edit, new OnClickListener() {
+
+			@Override
+			public void onClick(View v) {
+				// TODO Auto-generated method stub
+
+			}
+		});
+		toolbar.setVisibility(View.GONE);
+		addView(toolbar);
+	}
+
+	private ImageButton addToolbarButton(int resID, OnClickListener listener) {
+		ImageButton button = (ImageButton) inflater.inflate(R.layout.float_note_button, toolbar, true);
+		button.setImageResource(resID);
+		button.setOnClickListener(listener);
+		return button;
+	}
+
+	private void refresh(final PageSurface page) {
+		final SheetInfo sheet = adapter.getItem(page.index);
+		if (null == sheet) {
+			return;
+		}
+		decorate(page, sheet);
 		page.setOnLongClickListener(new OnLongClickListener() {
 
 			@Override
 			public boolean onLongClick(View v) {
-				Log.i(TAG, "On long page click: " + v.getLeft() + "x" + v.getTop());
-				return false;
+				int x = (int) (page.getLastDownX() * page.zoomFactor);
+				int y = (int) (page.getLastDownY() * page.zoomFactor);
+				Log.i(TAG, "On long page click: " + x + "x" + y);
+				NoteInfo info = new NoteInfo();
+				info.x = x;
+				info.y = y;
+				info.sheetID = sheet.id;
+				startEditor(info);
+				return true;
 			}
 		});
-		// requestLayout();
-		refresh(page);
-	}
-
-	private void refresh(final PageSurface page) {
-		final SheetInfo sheet = selector.adapter.getItem(page.index);
-		if (null == sheet) {
-			return;
-		}
 		AsyncTask<Void, Void, List<NoteInfo>> task = new AsyncTask<Void, Void, List<NoteInfo>>() {
 
 			@Override
 			protected List<NoteInfo> doInBackground(Void... params) {
-				List<NoteInfo> notes = selector.getController().getNotes(sheet.id);
+				List<NoteInfo> notes = adapter.getController().getNotes(sheet.id);
 				return notes;
 			}
 
@@ -179,6 +213,13 @@ public class MainSurface extends RelativeLayout {
 	// super.onLayout(changed, l, t, r, b);
 	// }
 
+	private void decorate(PageSurface surface, SheetInfo info) {
+		if (android.os.Build.VERSION.SDK_INT >= 11) {
+			new PageDnDDecorator(surface, info);
+		}
+
+	}
+
 	protected TextView createNoteTextItem(final PageSurface page, final NoteInfo info) {
 		final TextView textView = new TextView(getContext());
 		int width = (int) (info.width / page.zoomFactor);
@@ -193,7 +234,7 @@ public class MainSurface extends RelativeLayout {
 		params.addRule(RelativeLayout.ALIGN_PARENT_LEFT);
 		params.leftMargin = (int) (info.x / page.zoomFactor + page.marginLeft);
 		params.topMargin = (int) (info.y / page.zoomFactor + page.marginTop);
-		textView.setBackgroundResource(R.drawable.note0);
+		textView.setBackgroundResource(adapter.getController().getBackgroundDrawable(info.color));
 		int textPadding = (int) (TEXT_PADDING / page.zoomFactor);
 		textView.setPadding(textPadding, textPadding, textPadding, textPadding);
 		textView.setTextSize(TypedValue.COMPLEX_UNIT_PX, TEXT_SIZE / page.zoomFactor);
@@ -208,6 +249,7 @@ public class MainSurface extends RelativeLayout {
 				// Log.i(TAG, "Focus changed: " + info.id + ", " + hasFocus);
 				if (hasFocus) { // Bring to front first
 					textView.bringToFront();
+					// TODO: show toolbar
 				}
 				if (info.collapsible) { // Change state
 					RelativeLayout.LayoutParams params = (LayoutParams) textView.getLayoutParams();
@@ -226,8 +268,7 @@ public class MainSurface extends RelativeLayout {
 			@Override
 			public boolean onLongClick(View arg0) {
 				Log.i(TAG, "Text long click");
-				DialogFragment fragment = EditorDialogFragment.newInstance(info);
-				fragment.show(activity.getSupportFragmentManager(), "editor");
+				startEditor(info);
 				return true;
 			}
 		});
@@ -251,5 +292,10 @@ public class MainSurface extends RelativeLayout {
 			}
 		});
 		return textView;
+	}
+
+	private void startEditor(NoteInfo info) {
+		DialogFragment fragment = EditorDialogFragment.newInstance(info, adapter.getController());
+		fragment.show(activity.getSupportFragmentManager(), "editor");
 	}
 }

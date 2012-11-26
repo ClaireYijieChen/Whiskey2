@@ -18,8 +18,6 @@ import android.widget.RelativeLayout;
 public class ListPageSelector extends ListView {
 
 	public static interface PagesSelectorListener {
-		public void onPagesChanged(long notepadID);
-
 		public void onPageSelected(int position, long id);
 	}
 
@@ -27,7 +25,7 @@ public class ListPageSelector extends ListView {
 
 	private static final String TAG = "PageSelector";
 	public SheetsAdapter adapter = null;
-	public boolean collapsed = false;
+	public boolean collapsed = true;
 	boolean collapsible = true;
 	static int collapsedWidth = 30;
 	static int expandedWidth = 150;
@@ -54,22 +52,20 @@ public class ListPageSelector extends ListView {
 		density = getContext().getResources().getDisplayMetrics().density;
 	}
 
-	public void update(DataController controller, long notepadID, Long sheetID) {
-		this.controller = controller;
-		adapter.update(controller, notepadID, sheetID);
-	}
-
 	@Override
 	protected void onFocusChanged(boolean gainFocus, int direction, Rect previouslyFocusedRect) {
 		super.onFocusChanged(gainFocus, direction, previouslyFocusedRect);
 		Log.i(TAG, "Focus changed: " + gainFocus);
-		// if (gainFocus) { // Got focus
-		collapseExpand(!gainFocus);
-		// }
+		if (gainFocus) { // Got focus
+			collapseExpand(false);
+		}
 	}
 
 	public void collapseExpand(boolean collapse) {
 		if (!collapsible) { // Not supported
+			if (!collapse) { // Request focus
+				requestFocus();
+			}
 			return;
 		}
 		collapsed = collapse;
@@ -78,6 +74,7 @@ public class ListPageSelector extends ListView {
 			params.width = (int) (collapsedWidth * density);
 		} else {
 			params.width = (int) (expandedWidth * density);
+			requestFocus();
 		}
 		getParent().requestLayout();
 	}
@@ -85,14 +82,6 @@ public class ListPageSelector extends ListView {
 	public void addListener(PagesSelectorListener listener) {
 		if (!listeners.contains(listener)) { // New
 			listeners.add(listener);
-		}
-	}
-
-	public void notifyPagesChanged(long notepadID) {
-		// Log.i(TAG, "Notify pages changed: " + adapter.getCount() + ", " +
-		// listeners.size());
-		for (PagesSelectorListener l : listeners) { // Iterate and notify
-			l.onPagesChanged(notepadID);
 		}
 	}
 
