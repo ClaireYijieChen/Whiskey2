@@ -733,7 +733,7 @@
       colors = $('#note-dialog-colors').empty();
       widths = $('#note-dialog-widths').empty();
       currentColor = (_ref2 = note.color) != null ? _ref2 : (_ref3 = this.lastColor) != null ? _ref3 : 0;
-      currentWidth = (_ref4 = note.width) != null ? _ref4 : (_ref5 = this.lastWidth) != null ? _ref5 : this.noteWidths[0];
+      currentWidth = (_ref4 = note.width) != null ? _ref4 : (_ref5 = this.lastWidth) != null ? _ref5 : this.noteWidths[this.noteDefaultWidth];
       for (color = 0, _ref6 = this.colors; 0 <= _ref6 ? color < _ref6 : color > _ref6; 0 <= _ref6 ? color++ : color--) {
         a = $(document.createElement('a')).addClass('btn btn-small').attr({
           href: '#'
@@ -856,7 +856,7 @@
           return e.stopPropagation();
         });
         div.addClass('note-color0 note-color' + ((_ref = note.color) != null ? _ref : 0));
-        width = (_ref2 = note.width) != null ? _ref2 : _this.noteWidths[0];
+        width = (_ref2 = note.width) != null ? _ref2 : _this.noteWidths[_this.noteDefaultWidth];
         width = _this.preciseEm(width);
         x = _this.preciseEm((_ref3 = note.x) != null ? _ref3 : 0);
         y = _this.preciseEm((_ref4 = note.y) != null ? _ref4 : 0);
@@ -898,14 +898,18 @@
 
     Notepad.prototype.noteWidths = [50, 75, 90, 125];
 
+    Notepad.prototype.noteDefaultWidth = 1;
+
     Notepad.prototype.zoomFactor = 5;
 
     Notepad.prototype.colors = 8;
 
     Notepad.prototype.gridStep = 6;
 
+    Notepad.prototype.stick = true;
+
     Notepad.prototype.loadSheet = function(index, div) {
-      var clearSelector, divContent, divTitle, height, inRectangle, notesInRectangle, offsetToCoordinates, sheet, template, width, _ref,
+      var clearSelector, divContent, divTitle, height, inRectangle, notesInRectangle, offsetToCoordinates, sheet, stickToGrid, template, width, _ref,
         _this = this;
       clearSelector = function() {
         if (_this.selectorDiv) {
@@ -950,6 +954,13 @@
       };
       offsetToCoordinates = function(x, y) {
         return [Math.floor(x / divContent.width() * template.width), Math.floor(y / divContent.height() * template.height)];
+      };
+      stickToGrid = function(x, y) {
+        if (_this.stick) {
+          return [Math.round(x / _this.gridStep) * _this.gridStep, Math.round(y / _this.gridStep) * _this.gridStep];
+        } else {
+          return [x, y];
+        }
       };
       sheet = this.sheets[index];
       if (!sheet) return null;
@@ -1028,8 +1039,9 @@
         }
       });
       divContent.bind('dblclick', function(e) {
-        var x, y, _ref2;
+        var x, y, _ref2, _ref3;
         _ref2 = offsetToCoordinates(e.offsetX, e.offsetY), x = _ref2[0], y = _ref2[1];
+        _ref3 = stickToGrid(x, y), x = _ref3[0], y = _ref3[1];
         _this.showNotesDialog(sheet, {
           x: x,
           y: y
@@ -1043,11 +1055,12 @@
         return false;
       });
       divContent.bind('drop', function(e) {
-        var config, id, offset, otherNote, x, y, _i, _len, _ref2, _ref3;
+        var config, id, offset, otherNote, x, y, _i, _len, _ref2, _ref3, _ref4;
         if (_this.app.dragHasType(e, 'custom/note')) {
           otherNote = _this.app.dragGetType(e, 'custom/note');
           offset = _this.app.dragGetOffset(e, divContent);
           _ref2 = offsetToCoordinates(offset.left - otherNote.x, offset.top - otherNote.y), x = _ref2[0], y = _ref2[1];
+          _ref3 = stickToGrid(x, y), x = _ref3[0], y = _ref3[1];
           if (otherNote.id) {
             _this.app.manager.findOne('notes', otherNote != null ? otherNote.id : void 0, function(err, note) {
               if (err) return _this.app.showError(err);
@@ -1061,9 +1074,9 @@
             });
           } else {
             config = [];
-            _ref3 = otherNote.ids;
-            for (_i = 0, _len = _ref3.length; _i < _len; _i++) {
-              id = _ref3[_i];
+            _ref4 = otherNote.ids;
+            for (_i = 0, _len = _ref4.length; _i < _len; _i++) {
+              id = _ref4[_i];
               config.push({
                 type: 'findOne',
                 id: id,

@@ -472,7 +472,7 @@ class Notepad
     colors = $('#note-dialog-colors').empty()
     widths = $('#note-dialog-widths').empty()
     currentColor = note.color ? (@lastColor ? 0)
-    currentWidth = note.width ? (@lastWidth ? @noteWidths[0])
+    currentWidth = note.width ? (@lastWidth ? @noteWidths[@noteDefaultWidth])
     for color in [0...@colors]
       a = $(document.createElement('a')).addClass('btn btn-small').attr(href: '#').data('index', color)
       a.appendTo colors
@@ -555,7 +555,7 @@ class Notepad
         e.preventDefault()
         e.stopPropagation()
       div.addClass('note-color0 note-color'+(note.color ? 0))
-      width = note.width ? @noteWidths[0]
+      width = note.width ? @noteWidths[@noteDefaultWidth]
       width = @preciseEm width
       x = @preciseEm(note.x ? 0)
       y = @preciseEm(note.y ? 0)
@@ -578,9 +578,11 @@ class Notepad
         loadNote item
         @notes.push item
   noteWidths: [50, 75, 90, 125]
+  noteDefaultWidth: 1
   zoomFactor: 5
   colors: 8
   gridStep: 6
+  stick: yes
 
   loadSheet: (index, div) ->
     clearSelector = () =>
@@ -608,6 +610,11 @@ class Notepad
 
     offsetToCoordinates = (x, y) ->
       [Math.floor(x/divContent.width()*template.width), Math.floor(y/divContent.height()*template.height)]
+    stickToGrid = (x, y) =>
+      if @stick
+        [Math.round(x/@gridStep)*@gridStep, Math.round(y/@gridStep)*@gridStep]
+      else
+        [x, y]
     sheet = @sheets[index]
     if not sheet then return null
     template = @app.getTemplate sheet.template_id
@@ -663,6 +670,7 @@ class Notepad
         @selectorDiv.css left: ''+@preciseEm(coords.x)+'em', top: ''+@preciseEm(coords.y)+'em', width: ''+@preciseEm(coords.width)+'em', height: ''+@preciseEm(coords.height)+'em'
     divContent.bind 'dblclick', (e) =>
       [x, y] = offsetToCoordinates e.offsetX, e.offsetY
+      [x, y] = stickToGrid x, y
       @showNotesDialog sheet, {x: x, y: y}, () =>
         @reloadSheets()
       e.preventDefault()
@@ -675,6 +683,7 @@ class Notepad
         otherNote = @app.dragGetType e, 'custom/note'
         offset = @app.dragGetOffset e, divContent
         [x, y] = offsetToCoordinates offset.left-otherNote.x, offset.top-otherNote.y
+        [x, y] = stickToGrid x, y
         if otherNote.id
           @app.manager.findOne 'notes', otherNote?.id, (err, note) =>
             if err then return @app.showError err
