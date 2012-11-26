@@ -83,8 +83,13 @@ public class MainSurface extends RelativeLayout {
 	private void createLayout(int width, int height) {
 		layoutCreated = true;
 		removeAllViews();
-		TemplateInfo template = adapter.getController().getTemplate(0);
 		// Log.i(TAG, "create layout: " + width + "x" + height);
+		final SheetInfo sheet = adapter.getItem(index);
+		if (null == sheet) {
+			return;
+		}
+		final PageSurface page = new PageSurface(getContext());
+		TemplateInfo template = adapter.getController().getTemplate(0);
 		int pagesDisplayed = 1;
 		float pageHeight = height - 2 * pageMargin;
 		float pageWidth = pageHeight * template.width / template.height;
@@ -114,7 +119,6 @@ public class MainSurface extends RelativeLayout {
 			top = 0;
 		}
 		RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams((int) pageWidth, (int) pageHeight);
-		final PageSurface page = new PageSurface(getContext());
 		page.title = adapter.getItem(index).title;
 		page.marginLeft = left;
 		page.index = index;
@@ -133,7 +137,7 @@ public class MainSurface extends RelativeLayout {
 			}
 		});
 		// requestLayout();
-		refresh(page);
+		refresh(page, sheet);
 		toolbar = (ViewGroup) inflater.inflate(R.layout.float_note_toolbar, this, false);
 		addToolbarButton(R.drawable.float_edit, new OnClickListener() {
 
@@ -148,17 +152,14 @@ public class MainSurface extends RelativeLayout {
 	}
 
 	private ImageButton addToolbarButton(int resID, OnClickListener listener) {
-		ImageButton button = (ImageButton) inflater.inflate(R.layout.float_note_button, toolbar, true);
+		ImageButton button = (ImageButton) inflater.inflate(R.layout.float_note_button, toolbar, false);
 		button.setImageResource(resID);
 		button.setOnClickListener(listener);
+		toolbar.addView(button);
 		return button;
 	}
 
-	private void refresh(final PageSurface page) {
-		final SheetInfo sheet = adapter.getItem(page.index);
-		if (null == sheet) {
-			return;
-		}
+	private void refresh(final PageSurface page, final SheetInfo sheet) {
 		decorate(page, sheet);
 		page.setOnLongClickListener(new OnLongClickListener() {
 
