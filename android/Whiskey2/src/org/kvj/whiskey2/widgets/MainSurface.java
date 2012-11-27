@@ -16,7 +16,6 @@ import android.support.v4.app.FragmentActivity;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.TypedValue;
-import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -42,7 +41,10 @@ public class MainSurface extends RelativeLayout {
 	private int index = -1;
 	private FragmentActivity activity;
 	private ViewGroup toolbar = null;
+	RelativeLayout.LayoutParams toolbarParams = new LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT,
+			RelativeLayout.LayoutParams.WRAP_CONTENT);
 	private LayoutInflater inflater = null;
+	protected NoteInfo currentNote = null;
 
 	public MainSurface(Context context, AttributeSet attrs) {
 		super(context, attrs);
@@ -80,33 +82,34 @@ public class MainSurface extends RelativeLayout {
 		parent = (ViewGroup) getParent();
 	}
 
-	private void createLayout(int width, int height) {
-		layoutCreated = true;
-		removeAllViews();
-		// Log.i(TAG, "create layout: " + width + "x" + height);
-		final SheetInfo sheet = adapter.getItem(index);
-		if (null == sheet) {
-			return;
-		}
-		final PageSurface page = new PageSurface(getContext());
-		TemplateInfo template = adapter.getController().getTemplate(0);
+	private void createViews(int width, int height, final PageSurface page, final SheetInfo sheet, TemplateInfo template) {
 		int pagesDisplayed = 1;
+		int contentWidth = template.width;
+		for (int i = 0; i < page.notes.size(); i++) {
+			// Check width of every note
+			NoteInfo note = page.notes.get(i);
+			int noteRight = note.x + note.width;
+			if (noteRight > contentWidth) { // Wider
+				contentWidth = noteRight;
+			}
+		}
+		int contentHeight = template.height;
 		float pageHeight = height - 2 * pageMargin;
-		float pageWidth = pageHeight * template.width / template.height;
+		float pageWidth = pageHeight * contentWidth / contentHeight;
 		// Log.i(TAG, "Calc page size pass 1: " + pageWidth + "x" + pageHeight +
 		// ", " + width + "x" + height);
 		if (pageWidth > width - 2 * pageMargin) { // Too wide
 			pageWidth = width - 2 * pageMargin;
 			// Recalculate height
-			pageHeight = pageWidth * template.height / template.width;
+			pageHeight = pageWidth * contentHeight / contentWidth;
 		}
 		// Log.i(TAG, "Calc page size pass 2: " + pageWidth + "x" + pageHeight +
 		// ", " + density);
-		float zoomFactor = template.width / pageWidth;
+		float zoomFactor = contentWidth / pageWidth;
 		if (zoomFactor > 0.1 * density) { //
 			zoomFactor = (float) (0.1 * density);
-			pageWidth = template.width / zoomFactor;
-			pageHeight = template.height / zoomFactor;
+			pageWidth = contentWidth / zoomFactor;
+			pageHeight = contentHeight / zoomFactor;
 		}
 		int leftGap = 0;
 		int left = (int) ((width - pageWidth) / 2);
@@ -128,6 +131,15 @@ public class MainSurface extends RelativeLayout {
 		params.addRule(RelativeLayout.ALIGN_PARENT_TOP);
 		params.addRule(RelativeLayout.ALIGN_PARENT_LEFT);
 		addView(page, params);
+		page.setOnFocusChangeListener(new OnFocusChangeListener() {
+
+			@Override
+			public void onFocusChange(View arg0, boolean focus) {
+				if (focus) { // Got focus - hide toolbar
+					toolbar.setVisibility(GONE);
+				}
+			}
+		});
 		page.setOnClickListener(new OnClickListener() {
 
 			@Override
@@ -137,29 +149,6 @@ public class MainSurface extends RelativeLayout {
 			}
 		});
 		// requestLayout();
-		refresh(page, sheet);
-		toolbar = (ViewGroup) inflater.inflate(R.layout.float_note_toolbar, this, false);
-		addToolbarButton(R.drawable.float_edit, new OnClickListener() {
-
-			@Override
-			public void onClick(View v) {
-				// TODO Auto-generated method stub
-
-			}
-		});
-		toolbar.setVisibility(View.GONE);
-		addView(toolbar);
-	}
-
-	private ImageButton addToolbarButton(int resID, OnClickListener listener) {
-		ImageButton button = (ImageButton) inflater.inflate(R.layout.float_note_button, toolbar, false);
-		button.setImageResource(resID);
-		button.setOnClickListener(listener);
-		toolbar.addView(button);
-		return button;
-	}
-
-	private void refresh(final PageSurface page, final SheetInfo sheet) {
 		decorate(page, sheet);
 		page.setOnLongClickListener(new OnLongClickListener() {
 
@@ -176,6 +165,34 @@ public class MainSurface extends RelativeLayout {
 				return true;
 			}
 		});
+		for (NoteInfo info : page.notes) { // Create textview's
+			TextView view = createNoteTextItem(page, info);
+			info.widget = view;
+		}
+		toolbar = (ViewGroup) inflater.inflate(R.layout.float_note_toolbar, this, false);
+		addToolbarButton(R.drawable.float_edit, new OnClickListener() {
+
+			@Override
+			public void onClick(View v) {
+				if (null != currentNote) { // Edit note
+					startEditor(currentNote);
+				}
+			}
+		});
+		toolbar.setVisibility(View.GONE);
+		addView(toolbar, toolbarParams);
+	}
+
+	private void createLayout(final int width, final int height) {
+		layoutCreated = true;
+		currentNote = null;
+		removeAllViews();
+		final SheetInfo sheet = adapter.getItem(index);
+		if (null == sheet) {
+			return;
+		}
+		final PageSurface page = new PageSurface(getContext());
+		final TemplateInfo template = adapter.getController().getTemplate(0);
 		AsyncTask<Void, Void, List<NoteInfo>> task = new AsyncTask<Void, Void, List<NoteInfo>>() {
 
 			@Override
@@ -186,33 +203,20 @@ public class MainSurface extends RelativeLayout {
 
 			@Override
 			protected void onPostExecute(List<NoteInfo> result) {
-				for (NoteInfo info : result) { // Create textview's
-					TextView view = createNoteTextItem(page, info);
-					info.widget = view;
-				}
-				page.notes.clear();
 				page.notes.addAll(result);
-				requestLayout();
+				createViews(width, height, page, sheet, template);
 			}
 		};
 		task.execute();
-		setOnKeyListener(new OnKeyListener() {
-
-			@Override
-			public boolean onKey(View v, int keyCode, KeyEvent event) {
-				Log.i(TAG, "Key event: " + keyCode);
-				return false;
-			}
-		});
 	}
 
-	//
-	// @Override
-	// protected void onLayout(boolean changed, int l, int t, int r, int b) {
-	// Log.i(TAG, "onLayout: " + toString() + ", " + l + "x" + t + " - " + r +
-	// "x" + b);
-	// super.onLayout(changed, l, t, r, b);
-	// }
+	private ImageButton addToolbarButton(int resID, OnClickListener listener) {
+		ImageButton button = (ImageButton) inflater.inflate(R.layout.float_note_button, toolbar, false);
+		button.setImageResource(resID);
+		button.setOnClickListener(listener);
+		toolbar.addView(button);
+		return button;
+	}
 
 	private void decorate(PageSurface surface, SheetInfo info) {
 		if (android.os.Build.VERSION.SDK_INT >= 11) {
@@ -223,6 +227,7 @@ public class MainSurface extends RelativeLayout {
 
 	protected TextView createNoteTextItem(final PageSurface page, final NoteInfo info) {
 		final TextView textView = new TextView(getContext());
+		textView.setId((int) info.id);
 		int width = (int) (info.width / page.zoomFactor);
 		int height = RelativeLayout.LayoutParams.WRAP_CONTENT;
 		if (info.collapsible) { // Collapsible - collapse
@@ -250,7 +255,10 @@ public class MainSurface extends RelativeLayout {
 				// Log.i(TAG, "Focus changed: " + info.id + ", " + hasFocus);
 				if (hasFocus) { // Bring to front first
 					textView.bringToFront();
-					// TODO: show toolbar
+					toolbarParams.addRule(RelativeLayout.ALIGN_TOP, textView.getId());
+					toolbarParams.addRule(RelativeLayout.RIGHT_OF, textView.getId());
+					toolbar.setVisibility(VISIBLE);
+					currentNote = info;
 				}
 				if (info.collapsible) { // Change state
 					RelativeLayout.LayoutParams params = (LayoutParams) textView.getLayoutParams();
@@ -264,15 +272,15 @@ public class MainSurface extends RelativeLayout {
 				}
 			}
 		});
-		textView.setOnLongClickListener(new OnLongClickListener() {
-
-			@Override
-			public boolean onLongClick(View arg0) {
-				Log.i(TAG, "Text long click");
-				startEditor(info);
-				return true;
-			}
-		});
+		// textView.setOnLongClickListener(new OnLongClickListener() {
+		//
+		// @Override
+		// public boolean onLongClick(View arg0) {
+		// Log.i(TAG, "Text long click");
+		// startEditor(info);
+		// return true;
+		// }
+		// });
 		textView.setOnClickListener(new OnClickListener() {
 
 			@Override

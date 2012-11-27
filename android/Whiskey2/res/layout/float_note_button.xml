@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ImageButton xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="@dimen/float_note_button_size"
-    android:layout_height="@dimen/float_note_button_size">
+    android:layout_height="@dimen/float_note_button_size"
+    android:scaleType="centerCrop"
+    android:padding="4dp"
+    android:layout_margin="0dp"
+    android:src="@drawable/float_edit"
+    android:background="@drawable/float_button_bg">
 </ImageButton>

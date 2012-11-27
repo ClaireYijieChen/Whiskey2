@@ -19,5 +19,6 @@
 	<color name="note_focused_br">#ff33b5e5</color>
 	<dimen name="note_br_size">1dp</dimen>
 	<dimen name="note_br_focused_size">2dp</dimen>
-			    
+	<color name="float_toolbar_bg">#ff888888</color>
+				    
 </resources>
