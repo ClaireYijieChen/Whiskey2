@@ -7,9 +7,7 @@ import org.kvj.whiskey2.data.DataController;
 import org.kvj.whiskey2.widgets.adapters.SheetsAdapter;
 
 import android.content.Context;
-import android.graphics.Rect;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ListView;
@@ -52,15 +50,16 @@ public class ListPageSelector extends ListView {
 		density = getContext().getResources().getDisplayMetrics().density;
 	}
 
-	@Override
-	protected void onFocusChanged(boolean gainFocus, int direction, Rect previouslyFocusedRect) {
-		super.onFocusChanged(gainFocus, direction, previouslyFocusedRect);
-		Log.i(TAG, "Focus changed: " + gainFocus);
-		if (gainFocus) { // Got focus
-			collapseExpand(false);
-		}
-	}
-
+	// @Override
+	// protected void onFocusChanged(boolean gainFocus, int direction, Rect
+	// previouslyFocusedRect) {
+	// super.onFocusChanged(gainFocus, direction, previouslyFocusedRect);
+	// Log.i(TAG, "Focus changed: " + gainFocus);
+	// if (gainFocus) { // Got focus
+	// collapseExpand(false);
+	// }
+	// }
+	//
 	public void collapseExpand(boolean collapse) {
 		if (!collapsible) { // Not supported
 			if (!collapse) { // Request focus

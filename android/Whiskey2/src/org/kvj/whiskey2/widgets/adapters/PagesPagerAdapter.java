@@ -5,11 +5,11 @@ import org.kvj.whiskey2.widgets.PagerItemFragment;
 
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
-import android.support.v4.app.FragmentPagerAdapter;
+import android.support.v4.app.FragmentStatePagerAdapter;
 import android.support.v4.view.ViewPager;
 import android.util.Log;
 
-public class PagesPagerAdapter extends FragmentPagerAdapter {
+public class PagesPagerAdapter extends FragmentStatePagerAdapter {
 
 	private static final String TAG = "PagesAdapter";
 	private ListPageSelector selector = null;

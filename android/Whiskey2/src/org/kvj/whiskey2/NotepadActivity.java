@@ -17,7 +17,6 @@ import org.kvj.whiskey2.widgets.adapters.NotebookListAdapter;
 import org.kvj.whiskey2.widgets.adapters.NotebookListAdapter.NotebookInfo;
 import org.kvj.whiskey2.widgets.adapters.PagesPagerAdapter;
 
-import android.app.ProgressDialog;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -153,7 +152,6 @@ public class NotepadActivity extends SherlockFragmentActivity implements Control
 	}
 
 	private void sync() {
-		final ProgressDialog progress = SuperActivity.showProgressDialog(this, "Sync...");
 		AsyncTask<Void, Void, String> task = new AsyncTask<Void, Void, String>() {
 
 			@Override
@@ -165,8 +163,9 @@ public class NotepadActivity extends SherlockFragmentActivity implements Control
 			protected void onPostExecute(String result) {
 				if (null != result) { // Error
 					SuperActivity.notifyUser(getApplicationContext(), result);
+					return;
 				}
-				progress.dismiss();
+				SuperActivity.notifyUser(getApplicationContext(), "Done");
 				refresh();
 			}
 
@@ -290,6 +289,8 @@ public class NotepadActivity extends SherlockFragmentActivity implements Control
 
 	@Override
 	public void noteChanged(NoteInfo info) {
+		// Log.i(TAG, "Note changed: " + pager.getChildAt(0) + ", " +
+		// pager.getChildCount());
 		refreshSheets();
 	}
 

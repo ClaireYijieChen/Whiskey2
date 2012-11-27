@@ -85,18 +85,13 @@ public class PageSurface extends View {
 		int width = getWidth();
 		int height = getHeight();
 		super.onDraw(canvas);
-		// paint.setShadowLayer(density * shadowGap, 2 * density * shadowGap, 2
-		// * density * shadowGap, Color.BLACK);
-		// paint.setStrokeWidth(density * borderSize);
 		paint.setColor(Color.WHITE);
 		paint.setStyle(Style.FILL);
-		float boxWidth = width - 4 * density;
-		float boxHeight = height - 4 * density;
+		float boxWidth = width - 2 * density;
+		float boxHeight = height - 2 * density;
 		canvas.drawRect(density * 2, density * 2, boxWidth, boxHeight, paint);
-		// paint.setShadowLayer(0, 0, 0, 0);
 		paint.setColor(Color.BLACK);
 		paint.setStyle(Style.STROKE);
-		// canvas.drawRect(0, 0, boxWidth, boxHeight, paint);
 		paint.setStyle(Style.FILL_AND_STROKE);
 		paint.setTextSize(TITLE_FONT_SIZE / zoomFactor);
 		paint.setStrokeWidth(density * FONT_WIDTH);

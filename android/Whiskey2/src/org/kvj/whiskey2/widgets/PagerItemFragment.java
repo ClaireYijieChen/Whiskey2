@@ -59,4 +59,8 @@ public class PagerItemFragment extends SherlockFragment {
 	public long getNotepadID() {
 		return notepadID;
 	}
+
+	public void update() {
+		surface.createLayout();
+	}
 }

@@ -7,6 +7,7 @@ import org.kvj.whiskey2.data.NoteInfo;
 import org.kvj.whiskey2.data.SheetInfo;
 import org.kvj.whiskey2.data.TemplateInfo;
 import org.kvj.whiskey2.widgets.adapters.SheetsAdapter;
+import org.kvj.whiskey2.widgets.v11.NoteDnDDecorator;
 import org.kvj.whiskey2.widgets.v11.PageDnDDecorator;
 
 import android.content.Context;
@@ -26,7 +27,7 @@ import android.widget.TextView;
 public class MainSurface extends RelativeLayout {
 
 	private static final String TAG = "MainSurface";
-	public static final int PAGE_MARGIN = 10;
+	public static final int PAGE_MARGIN = 15;
 	public static final int PAGES_GAP = 10;
 	public static final int TEXT_PADDING = 1;
 	private static final float TEXT_SIZE = 5;
@@ -45,6 +46,7 @@ public class MainSurface extends RelativeLayout {
 			RelativeLayout.LayoutParams.WRAP_CONTENT);
 	private LayoutInflater inflater = null;
 	protected NoteInfo currentNote = null;
+	private int floatButtonSize;
 
 	public MainSurface(Context context, AttributeSet attrs) {
 		super(context, attrs);
@@ -52,6 +54,7 @@ public class MainSurface extends RelativeLayout {
 		density = getContext().getResources().getDisplayMetrics().density;
 		pageMargin = density * PAGE_MARGIN;
 		pagesGap = density * PAGES_GAP;
+		floatButtonSize = getContext().getResources().getDimensionPixelSize(R.dimen.float_note_button_size);
 	}
 
 	public void setController(int index, SheetsAdapter adapter, FragmentActivity fragmentActivity) {
@@ -63,14 +66,12 @@ public class MainSurface extends RelativeLayout {
 	@Override
 	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
 		super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-		int width = parent.getMeasuredWidth();
-		int height = parent.getMeasuredHeight();
 		// Log.i(TAG, "On measure: " + getMeasuredWidth() + "x" +
 		// getMeasuredHeight() + ", " + layoutCreated + ", "
 		// + getParent() + ", " + parent.getMeasuredWidth() + "x" +
 		// parent.getMeasuredHeight());
-		if (!layoutCreated && width > 0 && height > 0) {
-			createLayout(width, height);
+		if (!layoutCreated) {
+			createLayout();
 		}
 	}
 
@@ -113,6 +114,9 @@ public class MainSurface extends RelativeLayout {
 		}
 		int leftGap = 0;
 		int left = (int) ((width - pageWidth) / 2);
+		if (left < floatButtonSize) {
+			left = (int) (width - floatButtonSize - pageWidth);
+		}
 		int top = (int) ((height - pageHeight) / 2);
 		// Log.i(TAG, "Left x top: " + left + "x" + top);
 		if (left < 0) { // Too big
@@ -130,6 +134,7 @@ public class MainSurface extends RelativeLayout {
 		params.setMargins(left, top, 0, 0);
 		params.addRule(RelativeLayout.ALIGN_PARENT_TOP);
 		params.addRule(RelativeLayout.ALIGN_PARENT_LEFT);
+		removeAllViews();
 		addView(page, params);
 		page.setOnFocusChangeListener(new OnFocusChangeListener() {
 
@@ -154,12 +159,12 @@ public class MainSurface extends RelativeLayout {
 
 			@Override
 			public boolean onLongClick(View v) {
-				int x = (int) (page.getLastDownX() * page.zoomFactor);
-				int y = (int) (page.getLastDownY() * page.zoomFactor);
-				Log.i(TAG, "On long page click: " + x + "x" + y);
+				float x = page.getLastDownX() * page.zoomFactor;
+				float y = page.getLastDownY() * page.zoomFactor;
+				// Log.i(TAG, "On long page click: " + x + "x" + y);
 				NoteInfo info = new NoteInfo();
-				info.x = x;
-				info.y = y;
+				info.x = adapter.getController().stickToGrid(x);
+				info.y = adapter.getController().stickToGrid(y);
 				info.sheetID = sheet.id;
 				startEditor(info);
 				return true;
@@ -168,6 +173,7 @@ public class MainSurface extends RelativeLayout {
 		for (NoteInfo info : page.notes) { // Create textview's
 			TextView view = createNoteTextItem(page, info);
 			info.widget = view;
+			decorateNoteView(view, info);
 		}
 		toolbar = (ViewGroup) inflater.inflate(R.layout.float_note_toolbar, this, false);
 		addToolbarButton(R.drawable.float_edit, new OnClickListener() {
@@ -183,10 +189,20 @@ public class MainSurface extends RelativeLayout {
 		addView(toolbar, toolbarParams);
 	}
 
-	private void createLayout(final int width, final int height) {
+	private void decorateNoteView(TextView view, NoteInfo info) {
+		if (android.os.Build.VERSION.SDK_INT >= 11) {
+			new NoteDnDDecorator(view, info);
+		}
+	}
+
+	void createLayout() {
+		final int width = parent.getMeasuredWidth();
+		final int height = parent.getMeasuredHeight();
+		if (width <= 0 || height <= 0) { // Not ready yet
+			return;
+		}
 		layoutCreated = true;
 		currentNote = null;
-		removeAllViews();
 		final SheetInfo sheet = adapter.getItem(index);
 		if (null == sheet) {
 			return;
@@ -220,9 +236,28 @@ public class MainSurface extends RelativeLayout {
 
 	private void decorate(PageSurface surface, SheetInfo info) {
 		if (android.os.Build.VERSION.SDK_INT >= 11) {
-			new PageDnDDecorator(surface, info);
+			new PageDnDDecorator(this, surface, info);
 		}
 
+	}
+
+	public void acceptDrop(PageSurface page, SheetInfo sheet, float x, float y, List<NoteInfo> notes) {
+		Log.i(TAG, "Accept drop: " + x + "x" + y + ", " + notes);
+		int noteX = adapter.getController().stickToGrid(x * page.zoomFactor);
+		int noteY = adapter.getController().stickToGrid(y * page.zoomFactor);
+
+		for (NoteInfo note : notes) {
+			NoteInfo noteInfo = adapter.getController().getNote(note.id);
+			if (null == noteInfo) {
+				Log.w(TAG, "Note not found: " + note.id);
+				continue;
+			}
+			noteInfo.sheetID = sheet.id;
+			noteInfo.x = noteX;
+			noteInfo.y = noteY;
+			adapter.getController().saveNote(noteInfo);
+		}
+		createLayout();
 	}
 
 	protected TextView createNoteTextItem(final PageSurface page, final NoteInfo info) {
@@ -233,8 +268,6 @@ public class MainSurface extends RelativeLayout {
 		if (info.collapsible) { // Collapsible - collapse
 			height = (int) (COLLPASED_HEIGHT / page.zoomFactor);
 		}
-		// Log.i(TAG, "Render text view: " + info.x + ": " + page.zoomFactor +
-		// ", " + width);
 		RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(width, height);
 		params.addRule(RelativeLayout.ALIGN_PARENT_TOP);
 		params.addRule(RelativeLayout.ALIGN_PARENT_LEFT);
@@ -258,6 +291,8 @@ public class MainSurface extends RelativeLayout {
 					toolbarParams.addRule(RelativeLayout.ALIGN_TOP, textView.getId());
 					toolbarParams.addRule(RelativeLayout.RIGHT_OF, textView.getId());
 					toolbar.setVisibility(VISIBLE);
+					toolbar.bringToFront();
+					toolbar.setLayoutParams(toolbarParams);
 					currentNote = info;
 				}
 				if (info.collapsible) { // Change state
@@ -272,39 +307,11 @@ public class MainSurface extends RelativeLayout {
 				}
 			}
 		});
-		// textView.setOnLongClickListener(new OnLongClickListener() {
-		//
-		// @Override
-		// public boolean onLongClick(View arg0) {
-		// Log.i(TAG, "Text long click");
-		// startEditor(info);
-		// return true;
-		// }
-		// });
-		textView.setOnClickListener(new OnClickListener() {
-
-			@Override
-			public void onClick(View v) {
-				Log.i(TAG, "Clicked: " + info.id + ", " + v + ", " + info.collapsible);
-				// textView.bringToFront();
-				// if (info.collapsible) { // Change state
-				// RelativeLayout.LayoutParams params = (LayoutParams)
-				// textView.getLayoutParams();
-				// if (info.collapsed) { // Expand
-				// params.height = RelativeLayout.LayoutParams.WRAP_CONTENT;
-				// } else {
-				// params.height = (int) (COLLPASED_HEIGHT / page.zoomFactor);
-				// }
-				// info.collapsed = !info.collapsed;
-				// textView.requestLayout();
-				// }
-			}
-		});
 		return textView;
 	}
 
 	private void startEditor(NoteInfo info) {
-		DialogFragment fragment = EditorDialogFragment.newInstance(info, adapter.getController());
+		DialogFragment fragment = EditorDialogFragment.newInstance(info);
 		fragment.show(activity.getSupportFragmentManager(), "editor");
 	}
 }

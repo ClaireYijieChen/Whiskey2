@@ -10,6 +10,7 @@ import org.kvj.bravo7.form.impl.widget.SpinnerIntegerAdapter;
 import org.kvj.bravo7.form.impl.widget.TextViewStringAdapter;
 import org.kvj.bravo7.form.impl.widget.TransientAdapter;
 import org.kvj.whiskey2.R;
+import org.kvj.whiskey2.Whiskey2App;
 import org.kvj.whiskey2.data.DataController;
 import org.kvj.whiskey2.data.NoteInfo;
 import org.kvj.whiskey2.data.SheetInfo;
@@ -41,9 +42,8 @@ public class EditorDialogFragment extends SherlockDialogFragment {
 	private static final String KEY_X = "x";
 	private static final String KEY_Y = "y";
 
-	public static EditorDialogFragment newInstance(NoteInfo info, DataController controller) {
+	public static EditorDialogFragment newInstance(NoteInfo info) {
 		EditorDialogFragment f = new EditorDialogFragment();
-		f.controller = controller;
 		Bundle args = new Bundle();
 		args.putLong(KEY_ID, info.id);
 		args.putBoolean(KEY_COLLAPSIBLE, info.collapsible);
@@ -62,6 +62,7 @@ public class EditorDialogFragment extends SherlockDialogFragment {
 
 	public EditorDialogFragment() {
 		super();
+		controller = Whiskey2App.getInstance().getBean(DataController.class);
 	}
 
 	@Override
@@ -145,6 +146,7 @@ public class EditorDialogFragment extends SherlockDialogFragment {
 		}
 		if (controller.removeNote(info)) { // Removed
 			dismiss();
+			controller.notifyNoteChanged(info);
 		} else {
 			SuperActivity.notifyUser(getActivity(), "Error removing note");
 			return;
@@ -181,6 +183,7 @@ public class EditorDialogFragment extends SherlockDialogFragment {
 		info.text = text;
 		if (controller.saveNote(info)) { // Saved
 			dismiss();
+			controller.notifyNoteChanged(info);
 		} else {
 			SuperActivity.notifyUser(getActivity(), "Error saving note");
 			return;

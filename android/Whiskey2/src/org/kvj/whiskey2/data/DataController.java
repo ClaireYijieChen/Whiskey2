@@ -36,6 +36,7 @@ public class DataController {
 	private Integer[] colors = { R.drawable.note0, R.drawable.note1, R.drawable.note2, R.drawable.note3,
 			R.drawable.note4, R.drawable.note5, R.drawable.note6, R.drawable.note7 };
 	public static Integer[] widths = { 50, 75, 90, 125 };
+	private int gridStep = 6;
 	List<DataControllerListener> listeners = new ArrayList<DataController.DataControllerListener>();
 
 	public DataController(Whiskey2App whiskey2App) {
@@ -257,6 +258,15 @@ public class DataController {
 		return widths;
 	}
 
+	public void notifyNoteChanged(NoteInfo note) {
+		synchronized (listeners) { // Lock for modifications
+			for (DataControllerListener l : listeners) { // Notify
+				l.noteChanged(note);
+			}
+		}
+
+	}
+
 	public boolean saveNote(NoteInfo info) {
 		SyncService svc = getRemote();
 		if (null == svc) { // No connection
@@ -266,11 +276,6 @@ public class DataController {
 		try { // Remote and JSON errors
 			PJSONObject obj = info.toPJSON();
 			svc.update("notes", obj);
-			synchronized (listeners) { // Lock for modifications
-				for (DataControllerListener l : listeners) { // Notify
-					l.noteChanged(info);
-				}
-			}
 			return true;
 		} catch (Exception e) {
 			Log.e(TAG, "Error saving note:", e);
@@ -287,11 +292,6 @@ public class DataController {
 		try { // Remote and JSON errors
 			PJSONObject obj = info.toPJSON();
 			svc.removeCascade("notes", obj);
-			synchronized (listeners) { // Lock for modifications
-				for (DataControllerListener l : listeners) { // Notify
-					l.noteChanged(info);
-				}
-			}
 			return true;
 		} catch (Exception e) {
 			Log.e(TAG, "Error removing note:", e);
@@ -318,5 +318,9 @@ public class DataController {
 			return colors[color];
 		}
 		return colors[0];
+	}
+
+	public int stickToGrid(float value) {
+		return Math.round(value / gridStep) * gridStep;
 	}
 }
