@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.kvj.whiskey2.data.DataController;
 import org.kvj.whiskey2.widgets.adapters.SheetsAdapter;
+import org.kvj.whiskey2.widgets.v11.SheetListDecorator;
 
 import android.content.Context;
 import android.util.AttributeSet;
@@ -42,6 +43,13 @@ public class ListPageSelector extends ListView {
 				notifyPageSelected(index, id);
 			}
 		});
+		decorate(this);
+	}
+
+	private void decorate(ListPageSelector listPageSelector) {
+		if (android.os.Build.VERSION.SDK_INT >= 11) {
+			SheetListDecorator.decorate(listPageSelector);
+		}
 	}
 
 	@Override

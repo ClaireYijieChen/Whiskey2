@@ -3,6 +3,7 @@ package org.kvj.whiskey2.widgets;
 import org.kvj.whiskey2.R;
 import org.kvj.whiskey2.widgets.adapters.SheetsAdapter;
 
+import android.app.Activity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -28,6 +29,24 @@ public class PagerItemFragment extends SherlockFragment {
 		this.notepadID = notepadID;
 		this.index = index;
 		this.adapter = adapter;
+	}
+
+	@Override
+	public void onAttach(Activity activity) {
+		super.onAttach(activity);
+		Log.i(TAG, "Attached: " + index);
+		if (null != adapter) { // Attach
+			adapter.setFragmentActive(this, true);
+		}
+	}
+
+	@Override
+	public void onDetach() {
+		super.onDetach();
+		Log.i(TAG, "Detached: " + index);
+		if (null != adapter) { // Attach
+			adapter.setFragmentActive(this, false);
+		}
 	}
 
 	@Override
@@ -62,5 +81,12 @@ public class PagerItemFragment extends SherlockFragment {
 
 	public void update() {
 		surface.createLayout();
+	}
+
+	public void refresh() {
+		Log.i(TAG, "Refresh page: " + index + ", " + surface);
+		if (null != surface) { // Have surface
+			surface.createLayout();
+		}
 	}
 }

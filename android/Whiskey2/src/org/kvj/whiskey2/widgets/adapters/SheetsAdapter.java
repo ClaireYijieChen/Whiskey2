@@ -1,12 +1,16 @@
 package org.kvj.whiskey2.widgets.adapters;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.kvj.whiskey2.R;
 import org.kvj.whiskey2.data.DataController;
 import org.kvj.whiskey2.data.SheetInfo;
 import org.kvj.whiskey2.widgets.ListPageSelector;
+import org.kvj.whiskey2.widgets.PagerItemFragment;
+import org.kvj.whiskey2.widgets.v11.SheetListDecorator;
 
 import android.content.Context;
 import android.database.DataSetObserver;
@@ -29,6 +33,7 @@ public class SheetsAdapter implements ListAdapter {
 	List<SheetInfo> data = new ArrayList<SheetInfo>();
 	private DataSetObserver observer = null;
 	private DataController controller = null;
+	Set<PagerItemFragment> activeFragments = new HashSet<PagerItemFragment>();
 
 	@Override
 	public int getCount() {
@@ -61,9 +66,16 @@ public class SheetsAdapter implements ListAdapter {
 					Context.LAYOUT_INFLATER_SERVICE);
 			view = inflater.inflate(R.layout.sheet_item, group, false);
 		}
+		decorate(this, view, index);
 		TextView textView = (TextView) view.findViewById(R.id.sheet_item_title);
 		textView.setText(info.title);
 		return view;
+	}
+
+	private void decorate(SheetsAdapter sheetsAdapter, View view, int position) {
+		if (android.os.Build.VERSION.SDK_INT >= 11) {
+			SheetListDecorator.decorateItem(sheetsAdapter, view, position);
+		}
 	}
 
 	@Override
@@ -131,6 +143,28 @@ public class SheetsAdapter implements ListAdapter {
 
 	public DataController getController() {
 		return controller;
+	}
+
+	public ListPageSelector getSelector() {
+		return selector;
+	}
+
+	public void setFragmentActive(PagerItemFragment fragment, boolean active) {
+		synchronized (activeFragments) { // Lock
+			if (active) { // Add
+				activeFragments.add(fragment);
+			} else { // Remove
+				activeFragments.remove(fragment);
+			}
+		}
+	}
+
+	public void refreshVisiblePages() {
+		synchronized (activeFragments) { // Lock
+			for (PagerItemFragment fragment : activeFragments) { // Refresh
+				fragment.refresh();
+			}
+		}
 	}
 
 }

@@ -257,7 +257,7 @@ public class MainSurface extends RelativeLayout {
 			noteInfo.y = noteY;
 			adapter.getController().saveNote(noteInfo);
 		}
-		createLayout();
+		adapter.getController().notifyNoteChanged(null);
 	}
 
 	protected TextView createNoteTextItem(final PageSurface page, final NoteInfo info) {

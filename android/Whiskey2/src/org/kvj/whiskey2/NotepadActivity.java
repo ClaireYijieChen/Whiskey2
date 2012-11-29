@@ -64,7 +64,7 @@ public class NotepadActivity extends SherlockFragmentActivity implements Control
 			sync();
 			break;
 		case R.id.menu_reload: // Reload selected notepad
-			refresh();
+			refreshNotepad();
 			break;
 		}
 
@@ -74,7 +74,7 @@ public class NotepadActivity extends SherlockFragmentActivity implements Control
 	private void selectPage(int position, boolean animate) {
 		pager.setCurrentItem(position, animate);
 		pager.requestFocus();
-		sheetSelector.collapseExpand(true);
+		// sheetSelector.collapseExpand(true);
 	}
 
 	@Override
@@ -289,9 +289,7 @@ public class NotepadActivity extends SherlockFragmentActivity implements Control
 
 	@Override
 	public void noteChanged(NoteInfo info) {
-		// Log.i(TAG, "Note changed: " + pager.getChildAt(0) + ", " +
-		// pager.getChildCount());
-		refreshSheets();
+		sheetSelector.adapter.refreshVisiblePages();
 	}
 
 }
