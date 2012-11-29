@@ -281,7 +281,7 @@ var AsyncGrouper = function(count, handler) {//Run async tasks, call handler whe
 AsyncGrouper.prototype.check = function() {//Check count status
     if (this.index == this.count && !this.handlerCalled) {//Done
         this.handlerCalled = true;
-        this.handler(this);
+        this.handler(this, findError());
     };
 };
 

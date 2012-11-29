@@ -1,5 +1,5 @@
 (function() {
-  var AirCacheProvider, AirDBProvider, CacheProvider, ChannelProvider, DBProvider, DataManager, DesktopChannelProvider, HTML5CacheProvider, HTML5Provider, PhoneGapCacheProvider, StorageProvider,
+  var AirCacheProvider, AirDBProvider, CacheProvider, ChannelProvider, DBProvider, DataManager, DesktopChannelProvider, HTML5CacheProvider, HTML5Provider, PhoneGapCacheProvider, SchemaInfo, StorageProvider, data_table_template,
     __hasProp = Object.prototype.hasOwnProperty,
     __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor; child.__super__ = parent.prototype; return child; };
 
@@ -847,13 +847,149 @@
 
   })(DBProvider);
 
+  SchemaInfo = (function() {
+
+    SchemaInfo.prototype.tables = {};
+
+    SchemaInfo.prototype.upgrades = 0;
+
+    function SchemaInfo(json) {
+      this.json = json;
+      this.upgrades = this.parseSchema(this.json);
+      this.rev = this.json._rev;
+    }
+
+    SchemaInfo.prototype.parseSchema = function(json) {
+      var fk, fkTable, fkeys, item, name, pk, pkTable, upgrades, _i, _j, _len, _len2, _ref, _ref2, _ref3, _ref4;
+      for (name in json) {
+        item = json[name];
+        if (_.startsWith(name, '_')) continue;
+        this.tables[name] = this.parseTable(name, item);
+      }
+      fkeys = (_ref = json._fkeys) != null ? _ref : [];
+      for (_i = 0, _len = fkeys.length; _i < _len; _i++) {
+        item = fkeys[_i];
+        pk = ((_ref2 = item.pk) != null ? _ref2 : '').split('.');
+        fk = ((_ref3 = item.fk) != null ? _ref3 : '').split('.');
+        pkTable = this.tables[pk[0]];
+        fkTable = this.tables[fk[0]];
+        if (pkTable && fkTable) {
+          pkTable.fkeys.push({
+            table: fk[0],
+            field: fk[1]
+          });
+        }
+      }
+      upgrades = (_ref4 = json._upgrades) != null ? _ref4 : [];
+      for (_j = 0, _len2 = upgrades.length; _j < _len2; _j++) {
+        item = upgrades[_j];
+        this.parseSchema(item);
+      }
+      return upgrades.length;
+    };
+
+    SchemaInfo.prototype.parseTable = function(name, item) {
+      var arr, object, value, _i, _j, _k, _len, _len2, _len3, _ref, _ref2, _ref3;
+      object = this.tables[name];
+      if (!object) {
+        object = {
+          texts: {},
+          numbers: {},
+          indexes: [],
+          fkeys: []
+        };
+      }
+      arr = (_ref = item.texts) != null ? _ref : [];
+      for (_i = 0, _len = arr.length; _i < _len; _i++) {
+        value = arr[_i];
+        object.texts[value] = true;
+      }
+      arr = (_ref2 = item.numbers) != null ? _ref2 : [];
+      for (_j = 0, _len2 = arr.length; _j < _len2; _j++) {
+        value = arr[_j];
+        object.numbers[value] = true;
+      }
+      arr = (_ref3 = item.indexes) != null ? _ref3 : [];
+      for (_k = 0, _len3 = arr.length; _k < _len3; _k++) {
+        item = arr[_k];
+        object.indexes.push(item);
+      }
+      return object;
+    };
+
+    SchemaInfo.prototype.upgradeSchema = function(from) {
+      var name, otherTable, sqls, table, _ref;
+      sqls = [];
+      _ref = this.tables;
+      for (name in _ref) {
+        table = _ref[name];
+        otherTable = from != null ? from.tables[name] : void 0;
+        if (!otherTable) {
+          this.createTable(name, table, sqls);
+        } else {
+          this.alterTable(name, table, otherTable, sqls);
+        }
+      }
+      return sqls;
+    };
+
+    SchemaInfo.prototype.alterTable = function(name, table, other, sqls) {
+      var field, i, _ref, _ref2, _results;
+      for (field in table.texts) {
+        if (!other.texts[field]) {
+          sqls.push("alter table t_" + name + " add f_" + field + " text");
+        }
+      }
+      for (field in table.numbers) {
+        if (!other.numbers[field]) {
+          sqls.push("alter table t_" + name + " add f_" + field + " integer");
+        }
+      }
+      _results = [];
+      for (i = _ref = other.indexes.length, _ref2 = table.indexes.length; _ref <= _ref2 ? i < _ref2 : i > _ref2; _ref <= _ref2 ? i++ : i--) {
+        _results.push(this.createIndex(name, i, table.indexes[i], sqls));
+      }
+      return _results;
+    };
+
+    SchemaInfo.prototype.createTable = function(name, table, sqls) {
+      var field, i, sql, _ref, _results;
+      sql = "create table if not exists t_" + name + " " + data_table_template;
+      for (field in table.texts) {
+        sql += ", f_" + field + " text";
+      }
+      for (field in table.numbers) {
+        sql += ", f_" + field + " integer";
+      }
+      sqls.push(sql + ')');
+      _results = [];
+      for (i = 0, _ref = table.indexes.length; 0 <= _ref ? i < _ref : i > _ref; 0 <= _ref ? i++ : i--) {
+        _results.push(this.createIndex(name, i, table.indexes[i], sqls));
+      }
+      return _results;
+    };
+
+    SchemaInfo.prototype.createIndex = function(name, i, index, sqls) {
+      var field, sql, _i, _len;
+      sql = "create index if not exists i_" + name + "_" + i + " on t_" + name + " (status";
+      for (_i = 0, _len = index.length; _i < _len; _i++) {
+        field = index[_i];
+        sql += ", f_" + field;
+      }
+      return sqls.push(sql + ')');
+    };
+
+    return SchemaInfo;
+
+  })();
+
+  data_table_template = '(id integer primary key, status integer default 0, updated integer default 0, own integer default 1, stream text, data text';
+
   StorageProvider = (function() {
 
     StorageProvider.prototype.last_id = 0;
 
     StorageProvider.prototype.db_schema = ['create table if not exists updates (id integer primary key, version_in integer, version_out integer, version text)', 'create table if not exists schema (id integer primary key, token text, schema text)', 'create table if not exists uploads (id integer primary key, path text, name text, status integer)'];
-
-    StorageProvider.prototype.data_template = '(id integer primary key, status integer default 0, updated integer default 0, own integer default 1, stream text, data text';
 
     StorageProvider.prototype.SYNC_NETWORK = 0;
 
@@ -864,6 +1000,7 @@
     function StorageProvider(db) {
       this.db = db;
       this.on_channel_state = new EventEmitter(this);
+      this.stateListener = new EventEmitter(this);
     }
 
     StorageProvider.prototype.open = function(handler) {
@@ -875,10 +1012,13 @@
             log('StorageProvider::Verify result', err, reset);
             if (err) return handler(err);
             return _this.db.query('select schema, token from schema', [], function(err, data) {
+              var schema;
               if (err) return handler(err);
               if (data.length > 0) {
-                _this.schema = JSON.parse(data[0].schema);
+                schema = JSON.parse(data[0].schema);
                 _this.token = data[0].token;
+                _this.schemaInfo = new SchemaInfo(schema);
+                log('SchemaInfo', _this.schemaInfo);
               }
               return handler(null);
             });
@@ -896,11 +1036,11 @@
     };
 
     StorageProvider.prototype._precheck = function(stream, handler) {
-      if (!this.schema) {
+      if (!this.schemaInfo) {
         handler('Not synchronized');
         return false;
       }
-      if (!this.schema[stream]) {
+      if (!this.schemaInfo.tables[stream]) {
         handler('Unsupported stream');
         return false;
       }
@@ -915,8 +1055,8 @@
       });
     };
 
-    StorageProvider.prototype.sync = function(app, oauth, handler, force_clean, progress_handler) {
-      var clean_sync, do_reset_schema, finish_sync, get_last_sync, in_from, in_items, out_from, out_items, receive_out, reset_schema, schema_uri, send_in, upload_file,
+    StorageProvider.prototype.sync = function(app, oauth, handler, progress_handler) {
+      var clean_sync, finish_sync, get_last_sync, in_from, in_items, out_from, out_items, receive_out, reset_schema, schema_uri, send_in, upload_file,
         _this = this;
       oauth.token = this.token;
       reset_schema = false;
@@ -936,11 +1076,10 @@
         progress_handler(_this.SYNC_WRITE_DATA);
         return _this.db.query('insert into updates (id, version_in, version_out) values (?, ?, ?)', [_this._id(), in_from, out_from], function() {
           var item, name, _ref;
-          _ref = _this.schema;
+          _ref = _this.schemaInfo.tables;
           for (name in _ref) {
             item = _ref[name];
-            if ((name != null ? name.charAt(0) : void 0) === '_') continue;
-            _this.db.query('delete from t_' + name + ' where status=?', [3], function() {});
+            _this.db.query('delete from t_' + name + ' where status=? and updated<=?', [3, in_from], function() {});
           }
           return handler(err, {
             "in": in_items,
@@ -1024,30 +1163,25 @@
         });
       };
       send_in = function() {
-        var item, name, slots, sql, vars, _ref, _ref2;
+        var name, slots, sql, vars;
         progress_handler(_this.SYNC_READ_DATA);
-        if (force_clean) return do_reset_schema(null);
-        slots = (_ref = _this.schema._slots) != null ? _ref : 10;
+        slots = 10;
         sql = [];
         vars = [];
-        _ref2 = _this.schema;
-        for (name in _ref2) {
-          item = _ref2[name];
-          if ((name != null ? name.charAt(0) : void 0) === '_') continue;
-          if (_.indexOf(_this.db.tables, 't_' + name) === -1) continue;
+        for (name in _this.schemaInfo.tables) {
           sql.push('select id, stream, data, updated, status from t_' + name + ' where own=? and updated>?');
           vars.push(1);
           vars.push(in_from);
         }
-        if (sql.length === 0) return do_reset_schema(null);
-        return _this.db.query(sql.join(' union ') + ' order by updated limit ' + slots, vars, function(err, data, tr) {
-          var i, item, result, slots_needed, slots_used, _ref3, _ref4;
+        if (sql.length === 0) return receive_out(null);
+        return _this.db.query(sql.join(' union ') + ' order by updated', vars, function(err, data, tr) {
+          var i, item, result, slots_needed, slots_used;
           if (err) return finish_sync(err);
           result = [];
           slots_used = 0;
           for (i in data) {
             item = data[i];
-            slots_needed = (_ref3 = (_ref4 = _this.schema[item.stream]) != null ? _ref4["in"] : void 0) != null ? _ref3 : 1;
+            slots_needed = 1;
             if (slots_needed + slots_used > slots) break;
             slots_used += slots_needed;
             result.push({
@@ -1061,11 +1195,7 @@
             out_items++;
           }
           if (result.length === 0) {
-            if (reset_schema) {
-              do_reset_schema(null);
-            } else {
-              receive_out(null);
-            }
+            receive_out(null);
             return;
           }
           progress_handler(_this.SYNC_NETWORK);
@@ -1077,62 +1207,8 @@
           });
         });
       };
-      do_reset_schema = function() {
-        var field, fields, index, index_field, index_idx, index_sql, indexes, item, name, new_schema, numbers, sql, texts, _i, _j, _k, _l, _len, _len2, _len3, _len4, _len5, _m, _ref, _ref2, _ref3, _ref4, _ref5;
-        progress_handler(_this.SYNC_WRITE_DATA);
-        _this.db.clean = true;
-        new_schema = [];
-        _ref = _this.db_schema;
-        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-          item = _ref[_i];
-          new_schema.push(item);
-        }
-        _ref2 = _this.schema;
-        for (name in _ref2) {
-          item = _ref2[name];
-          fields = {
-            id: 'id'
-          };
-          if ((name != null ? name.charAt(0) : void 0) === '_') continue;
-          numbers = (_ref3 = item.numbers) != null ? _ref3 : [];
-          texts = (_ref4 = item.texts) != null ? _ref4 : [];
-          sql = 'create table if not exists t_' + name + ' ' + _this.data_template;
-          for (_j = 0, _len2 = numbers.length; _j < _len2; _j++) {
-            field = numbers[_j];
-            sql += ', f_' + field + ' integer';
-          }
-          for (_k = 0, _len3 = texts.length; _k < _len3; _k++) {
-            field = texts[_k];
-            sql += ', f_' + field + ' text';
-          }
-          new_schema.push(sql + ')');
-          indexes = (_ref5 = item.indexes) != null ? _ref5 : [];
-          index_idx = 0;
-          for (_l = 0, _len4 = indexes.length; _l < _len4; _l++) {
-            index = indexes[_l];
-            index_sql = 'create index i_' + name + '_' + (index_idx++) + ' on t_' + name + ' (status';
-            for (_m = 0, _len5 = index.length; _m < _len5; _m++) {
-              index_field = index[_m];
-              index_sql += ', f_' + index_field;
-            }
-            new_schema.push(index_sql + ')');
-          }
-        }
-        return _this.db.verify(new_schema, function(err, reset) {
-          if (err) return finish_sync(err);
-          out_from = 0;
-          return _this.db.query('insert into schema (id, token, schema) values (?, ?, ?)', [_this._id(), _this.token, JSON.stringify(_this.schema)], function(err, data, tr) {
-            if (err) return handler(err);
-            return receive_out(null);
-          });
-        });
-      };
       get_last_sync = function() {
-        var _ref;
         progress_handler(_this.SYNC_READ_DATA);
-        if (_.indexOf((_ref = _this.db) != null ? _ref.tables : void 0, 'updates') === -1) {
-          return upload_file(null);
-        }
         return _this.db.query('select * from updates order by id desc', [], function(err, data) {
           if (err) return finish_sync(err);
           if (data.length > 0) {
@@ -1149,17 +1225,37 @@
       }
       progress_handler(this.SYNC_NETWORK);
       return oauth.rest(app, schema_uri, null, function(err, schema) {
+        var gr, schemaInfo, sql, sqls, _i, _len, _results;
         log('After schema', err, schema);
         if (err) return finish_sync(err);
         if (_this.channel && schema._channel) {
           _this.channel.on_channel(schema._channel);
         }
-        if (!_this.schema || _this.schema._rev !== schema._rev || force_clean) {
-          _this.schema = schema;
-          reset_schema = true;
-          clean_sync = true;
+        if (!_this.schemaInfo || _this.schemaInfo.rev < schema._rev) {
+          schemaInfo = new SchemaInfo(schema);
+          sqls = schemaInfo.upgradeSchema(_this.schemaInfo);
+          gr = new AsyncGrouper(sqls.length, function(gr) {
+            err = gr.findError();
+            if (err) return finish_sync(err);
+            _this.schemaInfo = schemaInfo;
+            gr = new AsyncGrouper(2, function(gr) {
+              err = gr.findError();
+              if (err) return finish_sync(err);
+              return get_last_sync(null);
+            });
+            _this.db.query('delete from schema', [], gr.fn);
+            return _this.db.query('insert into schema (id, token, schema) values (?, ?, ?)', [_this._id(), _this.token, JSON.stringify(schema)], gr.fn);
+          });
+          _results = [];
+          for (_i = 0, _len = sqls.length; _i < _len; _i++) {
+            sql = sqls[_i];
+            log('Upgrade schema:', sql);
+            _results.push(_this.db.query(sql, [], gr.fn));
+          }
+          return _results;
+        } else {
+          return get_last_sync(null);
         }
-        return get_last_sync(null);
       }, {
         check: true
       });
@@ -1261,24 +1357,24 @@
     };
 
     StorageProvider.prototype.create = function(stream, object, handler, options) {
-      var fields, i, numbers, questions, texts, values, _ref, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8, _ref9,
+      var field, fields, numbers, questions, texts, values, _ref, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7,
         _this = this;
       if (!this._precheck(stream, handler)) return;
       if (!object.id) object.id = this._id();
       questions = '?, ?, ?, ?, ?, ?';
       fields = 'id, status, updated, own, stream, data';
       values = [object.id, (_ref = options != null ? options.status : void 0) != null ? _ref : 1, (_ref2 = options != null ? options.updated : void 0) != null ? _ref2 : object.id, (_ref3 = options != null ? options.own : void 0) != null ? _ref3 : 1, stream, JSON.stringify(object)];
-      numbers = (_ref4 = this.schema[stream].numbers) != null ? _ref4 : [];
-      texts = (_ref5 = this.schema[stream].texts) != null ? _ref5 : [];
-      for (i = 0, _ref6 = numbers.length; 0 <= _ref6 ? i < _ref6 : i > _ref6; 0 <= _ref6 ? i++ : i--) {
+      numbers = (_ref4 = this.schemaInfo.tables[stream].numbers) != null ? _ref4 : {};
+      texts = (_ref5 = this.schemaInfo.tables[stream].texts) != null ? _ref5 : {};
+      for (field in numbers) {
         questions += ', ?';
-        fields += ', f_' + numbers[i];
-        values.push((_ref7 = object[numbers[i]]) != null ? _ref7 : null);
+        fields += ', f_' + field;
+        values.push((_ref6 = object[field]) != null ? _ref6 : null);
       }
-      for (i = 0, _ref8 = texts.length; 0 <= _ref8 ? i < _ref8 : i > _ref8; 0 <= _ref8 ? i++ : i--) {
+      for (field in texts) {
         questions += ', ?';
-        fields += ', f_' + texts[i];
-        values.push((_ref9 = object[texts[i]]) != null ? _ref9 : null);
+        fields += ', f_' + field;
+        values.push((_ref7 = object[field]) != null ? _ref7 : null);
       }
       return this.db.query('insert or replace into t_' + stream + ' (' + fields + ') values (' + questions + ')', values, function(err, _data, transaction) {
         if (err) {
@@ -1287,32 +1383,36 @@
           if (!(options != null ? options.internal : void 0)) {
             _this.on_change('create', stream, object.id);
           }
+          _this.stateListener.emit('change');
           return handler(null, object, transaction);
         }
       }, options != null ? options.transaction : void 0);
     };
 
     StorageProvider.prototype.update = function(stream, object, handler) {
-      var fields, i, numbers, texts, values, _ref, _ref2, _ref3, _ref4, _ref5, _ref6,
+      var field, fields, numbers, texts, values, _ref, _ref2, _ref3, _ref4,
         _this = this;
       if (!this._precheck(stream, handler)) return;
       if (!object || !object.id) return handler('Invalid object ID');
       fields = 'status=?, updated=?, own=?, data=?';
       values = [2, this._id(), 1, JSON.stringify(object)];
-      numbers = (_ref = this.schema[stream].numbers) != null ? _ref : [];
-      texts = (_ref2 = this.schema[stream].texts) != null ? _ref2 : [];
-      for (i = 0, _ref3 = numbers.length; 0 <= _ref3 ? i < _ref3 : i > _ref3; 0 <= _ref3 ? i++ : i--) {
-        fields += ', f_' + numbers[i] + '=?';
-        values.push((_ref4 = object[numbers[i]]) != null ? _ref4 : null);
+      numbers = (_ref = this.schemaInfo.tables[stream].numbers) != null ? _ref : {};
+      texts = (_ref2 = this.schemaInfo.tables[stream].texts) != null ? _ref2 : {};
+      for (field in numbers) {
+        fields += ', f_' + field + '=?';
+        values.push((_ref3 = object[field]) != null ? _ref3 : null);
       }
-      for (i = 0, _ref5 = texts.length; 0 <= _ref5 ? i < _ref5 : i > _ref5; 0 <= _ref5 ? i++ : i--) {
-        fields += ', f_' + texts[i] + '=?';
-        values.push((_ref6 = object[texts[i]]) != null ? _ref6 : null);
+      for (field in texts) {
+        fields += ', f_' + field + '=?';
+        values.push((_ref4 = object[field]) != null ? _ref4 : null);
       }
       values.push(object.id);
       values.push(stream);
       return this.db.query('update t_' + stream + ' set ' + fields + ' where id=? and stream=?', values, function(err) {
-        if (!err) _this.on_change('update', stream, object.id);
+        if (!err) {
+          _this.on_change('update', stream, object.id);
+          _this.stateListener.emit('change');
+        }
         return handler(err);
       });
     };
@@ -1322,7 +1422,10 @@
       if (!this._precheck(stream, handler)) return;
       if (!object || !object.id) return handler('Invalid object ID');
       return this.db.query('update t_' + stream + ' set status=?, updated=?, own=? where  id=? and stream=?', [3, this._id(new Date().getTime()), 1, object.id, stream], function(err) {
-        if (!err) _this.on_change('remove', stream, object.id);
+        if (!err) {
+          _this.on_change('remove', stream, object.id);
+          _this.stateListener.emit('change');
+        }
         return handler(err);
       });
     };
@@ -1332,21 +1435,14 @@
         _this = this;
       if (!this._precheck(stream, handler)) return;
       extract_fields = function(stream) {
-        var fields, i, name, numbers, _ref, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8;
-        numbers = (_ref = (_ref2 = _this.schema[stream]) != null ? _ref2.numbers : void 0) != null ? _ref : [];
+        var fields, name, _ref, _ref2;
         fields = {
           id: 'id'
         };
-        _ref5 = (_ref3 = (_ref4 = _this.schema[stream]) != null ? _ref4.texts : void 0) != null ? _ref3 : [];
-        for (i in _ref5) {
-          if (!__hasProp.call(_ref5, i)) continue;
-          name = _ref5[i];
+        for (name in (_ref = _this.schemaInfo.tables[stream].texts) != null ? _ref : {}) {
           fields[name] = 'f_' + name;
         }
-        _ref8 = (_ref6 = (_ref7 = _this.schema[stream]) != null ? _ref7.numbers : void 0) != null ? _ref6 : [];
-        for (i in _ref8) {
-          if (!__hasProp.call(_ref8, i)) continue;
-          name = _ref8[i];
+        for (name in (_ref2 = _this.schemaInfo.tables[stream].numbers) != null ? _ref2 : {}) {
           fields[name] = 'f_' + name;
         }
         return fields;
@@ -1495,9 +1591,9 @@
       return this.storage.open(function(err) {
         log('Open result', err);
         if (err) return handler(err);
-        _this.storage.on_change = function() {
-          return _this.schedule_sync(null);
-        };
+        _this.storage.stateListener.on('change', function() {
+          return _this.schedule_sync();
+        });
         return handler(null);
       });
     };
@@ -1549,24 +1645,21 @@
     };
 
     DataManager.prototype.removeCascade = function(stream, object, handler) {
-      var fk, gr, key, keys, select, selects, _i, _j, _len, _len2, _ref, _results,
+      var gr, key, keys, select, selects, table, _i, _j, _len, _len2, _results,
         _this = this;
       if (!this.storage._precheck(stream, handler)) return;
-      keys = (_ref = this.storage.schema._fkeys) != null ? _ref : [];
+      table = this.storage.schemaInfo.tables[stream];
+      keys = table.fkeys;
       selects = [];
       for (_i = 0, _len = keys.length; _i < _len; _i++) {
         key = keys[_i];
-        if (_.startsWith(key.pk, stream + '.id')) {
-          fk = key.fk.split('.');
-          if (fk.length !== 2) continue;
-          selects.push({
-            stream: fk[0],
-            query: [fk[1], object.id]
-          });
-        }
+        selects.push({
+          stream: key.table,
+          query: [key.field, object.id]
+        });
       }
       gr = new AsyncGrouper(selects.length, function(gr) {
-        var arr, config, data, err, i, _j, _len2, _ref2, _ref3;
+        var arr, config, data, err, i, _j, _len2, _ref, _ref2;
         err = gr.findError();
         if (err) return handler(err);
         config = [];
@@ -1575,11 +1668,11 @@
           stream: stream,
           object: object
         });
-        for (i = 0, _ref2 = gr.results.length; 0 <= _ref2 ? i < _ref2 : i > _ref2; 0 <= _ref2 ? i++ : i--) {
+        for (i = 0, _ref = gr.results.length; 0 <= _ref ? i < _ref : i > _ref; 0 <= _ref ? i++ : i--) {
           arr = gr.results[i];
-          _ref3 = arr[0];
-          for (_j = 0, _len2 = _ref3.length; _j < _len2; _j++) {
-            data = _ref3[_j];
+          _ref2 = arr[0];
+          for (_j = 0, _len2 = _ref2.length; _j < _len2; _j++) {
+            data = _ref2[_j];
             config.push({
               type: 'removeCascade',
               stream: selects[i].stream,
@@ -1665,7 +1758,7 @@
       return this.storage.db.set(name, value);
     };
 
-    DataManager.prototype.sync = function(handler, force_clean, progress_handler) {
+    DataManager.prototype.sync = function(handler, progress_handler) {
       var _this = this;
       if (progress_handler == null) progress_handler = function() {};
       if (this.in_sync) return false;
@@ -1676,7 +1769,7 @@
         _this.on_sync.emit('finish');
         if (!err && _this.timeout_id) _this.unschedule_sync(null);
         return handler(err, data);
-      }, force_clean, progress_handler);
+      }, progress_handler);
     };
 
     DataManager.prototype.restore = function(files, handler) {

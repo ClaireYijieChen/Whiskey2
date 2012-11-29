@@ -23,6 +23,8 @@ class Whiskey2
       @syncAlert = @showAlert 'Please stand by...', persistent: yes, content: @syncProgress
     @manager.on_sync.on 'finish', =>
       @syncAlert.remove()
+    @manager.on_scheduled_sync = () =>
+      @sync()
     @oauth.token = @manager.get('token', 'no-value')
     @manager.open (error) =>
       if error
@@ -33,6 +35,7 @@ class Whiskey2
         @showLoginDialog()
       @bindMain()
       @refreshNotepads()
+      @sync()
 
   showLoginDialog: ->
     $('#main-password').val('')
@@ -157,7 +160,7 @@ class Whiskey2
     @manager.sync (err) =>
       if err then return @showError err
       # @showAlert 'Sync done'
-    , no, (type) =>
+    , (type) =>
       w = 100
       switch type
         when 0 then w = 25

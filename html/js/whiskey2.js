@@ -38,6 +38,9 @@
       this.manager.on_sync.on('finish', function() {
         return _this.syncAlert.remove();
       });
+      this.manager.on_scheduled_sync = function() {
+        return _this.sync();
+      };
       this.oauth.token = this.manager.get('token', 'no-value');
       return this.manager.open(function(error) {
         if (error) {
@@ -51,7 +54,8 @@
           return _this.showLoginDialog();
         };
         _this.bindMain();
-        return _this.refreshNotepads();
+        _this.refreshNotepads();
+        return _this.sync();
       });
     };
 
@@ -259,7 +263,7 @@
       if (!this.manager) return;
       return this.manager.sync(function(err) {
         if (err) return _this.showError(err);
-      }, false, function(type) {
+      }, function(type) {
         var w;
         w = 100;
         switch (type) {

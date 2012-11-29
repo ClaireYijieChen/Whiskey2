@@ -616,11 +616,91 @@ class HTML5Provider extends DBProvider
   set: (name, value) ->
     window?.localStorage[env.prefix+name] = value
 
+class SchemaInfo
+  tables: {}
+  upgrades: 0
+
+  constructor: (@json) ->
+    @upgrades = @parseSchema @json
+    @rev = @json._rev
+
+  parseSchema: (json) ->
+    for name, item of json
+      if _.startsWith(name, '_') then continue; # skip
+      @tables[name] = @parseTable(name, item)
+    fkeys = json._fkeys ? []
+    for item in fkeys
+      pk = (item.pk ? '').split '.'
+      fk = (item.fk ? '').split '.'
+      pkTable = @tables[pk[0]]
+      fkTable = @tables[fk[0]]
+      if pkTable and fkTable
+        pkTable.fkeys.push {table: fk[0], field: fk[1]}
+    upgrades = json._upgrades ? []
+    for item in upgrades
+      @parseSchema item
+    return upgrades.length
+
+  parseTable: (name, item) ->
+    object = @tables[name]
+    if not object
+      object = texts: {}, numbers: {}, indexes: [], fkeys: []
+    arr = item.texts ? []
+    for value in arr
+      object.texts[value] = yes
+    arr = item.numbers ? []
+    for value in arr
+      object.numbers[value] = yes
+    arr = item.indexes ? []
+    for item in arr
+      object.indexes.push item
+    return object
+
+  upgradeSchema: (from) ->
+    sqls = []
+    for name, table of @tables
+      otherTable = from?.tables[name]
+      if not otherTable
+        # new table
+        @createTable name, table, sqls
+      else
+        @alterTable name, table, otherTable, sqls
+    return sqls
+
+  alterTable: (name, table, other, sqls) ->
+    for field of table.texts
+      if not other.texts[field]
+        sqls.push "alter table t_#{name} add f_#{field} text"
+    for field of table.numbers
+      if not other.numbers[field]
+        sqls.push "alter table t_#{name} add f_#{field} integer"
+    for i in [other.indexes.length...table.indexes.length]
+      @createIndex name, i, table.indexes[i], sqls
+
+  createTable: (name, table, sqls) ->
+    sql = "create table if not exists t_#{name} #{data_table_template}"
+    for field of table.texts
+      sql += ", f_#{field} text"
+    for field of table.numbers
+      sql += ", f_#{field} integer"
+    sqls.push sql+')'
+    for i in [0...table.indexes.length]
+      @createIndex name, i, table.indexes[i], sqls
+
+  createIndex: (name, i, index, sqls) ->
+    sql = "create index if not exists i_#{name}_#{i} on t_#{name} (status"
+    for field in index
+      sql += ", f_#{field}"
+    sqls.push sql+')'
+
+
+data_table_template = '(id integer primary key, status integer default 0, updated integer default 0, own integer default 1, stream text, data text'
+
+
 class StorageProvider
 
   last_id: 0
   db_schema: ['create table if not exists updates (id integer primary key, version_in integer, version_out integer, version text)', 'create table if not exists schema (id integer primary key, token text, schema text)', 'create table if not exists uploads (id integer primary key, path text, name text, status integer)']
-  data_template: '(id integer primary key, status integer default 0, updated integer default 0, own integer default 1, stream text, data text'
 
   SYNC_NETWORK: 0
   SYNC_READ_DATA: 1
@@ -628,6 +708,7 @@ class StorageProvider
 
   constructor: (@db) ->
     @on_channel_state = new EventEmitter this
+    @stateListener = new EventEmitter this
 
   open: (handler) ->
     @db.open false, (err) =>
@@ -640,8 +721,10 @@ class StorageProvider
             # log 'Schema', err, data
             if err then return handler err
             if data.length>0
-              @schema = JSON.parse data[0].schema
+              schema = JSON.parse data[0].schema
               @token = data[0].token
+              @schemaInfo = new SchemaInfo schema
+              log 'SchemaInfo', @schemaInfo
             handler null
 
   get: (name, def) ->
@@ -651,10 +734,10 @@ class StorageProvider
     return @db.set name, value
 
   _precheck: (stream, handler) ->
-    if not @schema
+    if not @schemaInfo
       handler 'Not synchronized'
       return false
-    if not @schema[stream]
+    if not @schemaInfo.tables[stream]
       handler 'Unsupported stream'
       return false
     return true
@@ -664,7 +747,7 @@ class StorageProvider
     @db.query 'update schema set token=?', [token], (err) =>
       if handler then handler err
 
-  sync: (app, oauth, handler, force_clean, progress_handler) ->
+  sync: (app, oauth, handler, progress_handler) ->
     # log 'Starting sync...', app
     oauth.token = @token
     reset_schema = no
@@ -680,9 +763,8 @@ class StorageProvider
         @on_channel_state.emit 'state', {state: @CHANNEL_NO_DATA}
       progress_handler @SYNC_WRITE_DATA
       @db.query 'insert into updates (id, version_in, version_out) values (?, ?, ?)', [@_id(), in_from, out_from], () =>
-        for name, item of @schema
-          if name?.charAt(0) == '_' then continue
-          @db.query 'delete from t_'+name+' where status=?', [3], () =>
+        for name, item of @schemaInfo.tables
+          @db.query 'delete from t_'+name+' where status=? and updated<=?', [3, in_from], () =>
         handler err, {
           in: in_items
           out: out_items
@@ -710,7 +792,6 @@ class StorageProvider
           @cache.upload row.name, (err) =>
             if err then return finish_sync err
             remove_entry null
-
     receive_out = (transaction) =>
       url = "/rest/out?from=#{out_from}&"
       if not clean_sync
@@ -748,23 +829,20 @@ class StorageProvider
               }
     send_in = () =>
       progress_handler @SYNC_READ_DATA
-      if force_clean then return do_reset_schema null
-      slots = @schema._slots ? 10
+      slots = 10
       sql = []
       vars = []
-      for name, item of @schema
-        if name?.charAt(0) == '_' then continue
-        if _.indexOf(@db.tables, 't_'+name) is -1 then continue
+      for name of @schemaInfo.tables
         sql.push 'select id, stream, data, updated, status from t_'+name+' where own=? and updated>?'
         vars.push 1
         vars.push in_from
-      if sql.length is 0 then return do_reset_schema null
-      @db.query sql.join(' union ')+' order by updated limit '+slots, vars, (err, data, tr) =>
+      if sql.length is 0 then return receive_out null
+      @db.query sql.join(' union ')+' order by updated', vars, (err, data, tr) =>
         if err then return finish_sync err
         result = []
         slots_used = 0
         for i, item of data
-          slots_needed = @schema[item.stream]?.in ? 1
+          slots_needed = 1
           if slots_needed+slots_used>slots then break
           slots_used += slots_needed
           result.push {
@@ -777,48 +855,15 @@ class StorageProvider
           in_from = item.updated
           out_items++
         if result.length is 0
-          if reset_schema then do_reset_schema null else receive_out null
+          receive_out null
           return
         progress_handler @SYNC_NETWORK
         oauth.rest app, '/rest/in?', JSON.stringify({a: result}), (err, res) =>
           # log 'After in:', err, res
           if err then return finish_sync err
           send_in null
-    do_reset_schema = () =>
-      progress_handler @SYNC_WRITE_DATA
-      @db.clean = yes
-      new_schema = []
-      for item in @db_schema
-        new_schema.push item
-      for name, item of @schema
-        fields = id: 'id'
-        if name?.charAt(0) == '_' then continue;
-        numbers = item.numbers ? []
-        texts = item.texts ? []
-        sql = 'create table if not exists t_'+name+' '+@data_template
-        for field in numbers
-          sql += ', f_'+field+' integer'
-        for field in texts
-          sql += ', f_'+field+' text'
-        new_schema.push sql+')'
-        indexes = item.indexes ? []
-        index_idx = 0
-        for index in indexes
-          index_sql = 'create index i_'+name+'_'+(index_idx++)+' on t_'+name+' (status';
-          for index_field in index
-            index_sql += ', f_'+index_field;
-          new_schema.push index_sql+')'
-      @db.verify new_schema, (err, reset) =>
-        # log 'Verify result', err, reset
-        if err then return finish_sync err
-        out_from = 0
-        @db.query 'insert into schema (id, token, schema) values (?, ?, ?)', [@_id(), @token, JSON.stringify @schema], (err, data, tr) =>
-          if err then return handler err
-          receive_out null
     get_last_sync = () =>
       progress_handler @SYNC_READ_DATA
-      if _.indexOf(@db?.tables, 'updates') is -1
-        return upload_file null
       @db.query 'select * from updates order by id desc', [], (err, data) =>
         if err then return finish_sync err
         if data.length>0
@@ -836,12 +881,24 @@ class StorageProvider
       if err then return finish_sync err
       if @channel and schema._channel
         @channel.on_channel schema._channel
-      if not @schema or @schema._rev isnt schema._rev or force_clean
-        @schema = schema
-        reset_schema = yes
-        clean_sync = yes
-
-      get_last_sync null
+      if not @schemaInfo or @schemaInfo.rev < schema._rev
+        schemaInfo = new SchemaInfo schema
+        sqls = schemaInfo.upgradeSchema @schemaInfo
+        gr = new AsyncGrouper sqls.length, (gr) =>
+          err = gr.findError()
+          if err then return finish_sync err
+          @schemaInfo = schemaInfo
+          gr = new AsyncGrouper 2, (gr) =>
+            err = gr.findError()
+            if err then return finish_sync err
+            get_last_sync null
+          @db.query 'delete from schema', [], gr.fn
+          @db.query 'insert into schema (id, token, schema) values (?, ?, ?)', [@_id(), @token, JSON.stringify(schema)], gr.fn
+        for sql in sqls
+          log 'Upgrade schema:', sql
+          @db.query sql, [], gr.fn
+      else
+        get_last_sync null
     , {
       check: true
     }
@@ -916,21 +973,22 @@ class StorageProvider
     questions = '?, ?, ?, ?, ?, ?'
     fields = 'id, status, updated, own, stream, data'
     values = [object.id, options?.status ? 1, options?.updated ? object.id, options?.own ? 1, stream, JSON.stringify(object)]
-    numbers = @schema[stream].numbers ? []
-    texts = @schema[stream].texts ? []
-    for i in [0...numbers.length]
+    numbers = @schemaInfo.tables[stream].numbers ? {}
+    texts = @schemaInfo.tables[stream].texts ? {}
+    for field of numbers
       questions += ', ?'
-      fields += ', f_'+numbers[i]
-      values.push object[numbers[i]] ? null
-    for i in [0...texts.length]
+      fields += ', f_'+field
+      values.push object[field] ? null
+    for field of texts
       questions += ', ?'
-      fields += ', f_'+texts[i]
-      values.push object[texts[i]] ? null
+      fields += ', f_'+field
+      values.push object[field] ? null
     return @db.query 'insert or replace into t_'+stream+' ('+fields+') values ('+questions+')', values, (err, _data, transaction) =>
       if err
         handler err
       else
         if not options?.internal then @on_change 'create', stream, object.id
+        @stateListener.emit 'change'
         handler null, object, transaction
     , options?.transaction
 
@@ -941,19 +999,20 @@ class StorageProvider
     # prepare SQL
     fields = 'status=?, updated=?, own=?, data=?'
     values = [2, @_id(), 1, JSON.stringify(object)]
-    numbers = @schema[stream].numbers ? []
-    texts = @schema[stream].texts ? []
-    for i in [0...numbers.length]
-      fields += ', f_'+numbers[i]+'=?'
-      values.push object[numbers[i]] ? null
-    for i in [0...texts.length]
-      fields += ', f_'+texts[i]+'=?'
-      values.push object[texts[i]] ? null
+    numbers = @schemaInfo.tables[stream].numbers ? {}
+    texts = @schemaInfo.tables[stream].texts ? {}
+    for field of numbers
+      fields += ', f_'+field+'=?'
+      values.push object[field] ? null
+    for field of texts
+      fields += ', f_'+field+'=?'
+      values.push object[field] ? null
     values.push object.id
     values.push stream
     @db.query 'update t_'+stream+' set '+fields+' where id=? and stream=?', values, (err) =>
       if not err
         @on_change 'update', stream, object.id
+        @stateListener.emit 'change'
       handler err
 
   remove: (stream, object, handler) ->
@@ -963,16 +1022,16 @@ class StorageProvider
     @db.query 'update t_'+stream+' set status=?, updated=?, own=? where  id=? and stream=?', [3, @_id(new Date().getTime()), 1, object.id, stream], (err) =>
       if not err
         @on_change 'remove', stream, object.id
+        @stateListener.emit 'change'
       handler err
 
   select: (stream, query, handler, options) ->
     if not @_precheck stream, handler then return
     extract_fields = (stream) =>
-      numbers = @schema[stream]?.numbers ? []
       fields = id: 'id'
-      for own i, name of @schema[stream]?.texts ? []
+      for name of @schemaInfo.tables[stream].texts ? {}
         fields[name] = 'f_'+name
-      for own i, name of @schema[stream]?.numbers ? []
+      for name of @schemaInfo.tables[stream].numbers ? {}
         fields[name] = 'f_'+name
       return fields
     fields = extract_fields stream
@@ -1084,8 +1143,8 @@ class DataManager
     @storage.open (err) =>
       log 'Open result', err
       if err then return handler err
-      @storage.on_change = () =>
-        @schedule_sync null
+      @storage.stateListener.on 'change', () =>
+        @schedule_sync()
       handler null
 
   unschedule_sync: () ->
@@ -1128,13 +1187,11 @@ class DataManager
   removeCascade: (stream, object, handler) ->
     # log 'removeCascade', stream, object
     if not @storage._precheck stream, handler then return
-    keys = @storage.schema._fkeys ? []
+    table = @storage.schemaInfo.tables[stream]
+    keys = table.fkeys
     selects = []
     for key in keys
-      if _.startsWith key.pk, stream+'.id'
-        fk = key.fk.split '.'
-        if fk.length isnt 2 then continue
-        selects.push stream: fk[0], query: [fk[1], object.id]
+      selects.push stream: key.table, query: [key.field, object.id]
     gr = new AsyncGrouper selects.length, (gr) =>
       err = gr.findError()
       if err then return handler err
@@ -1186,7 +1243,7 @@ class DataManager
   set: (name, value) ->
     return @storage.db.set name, value
 
-  sync: (handler, force_clean, progress_handler = () ->) ->
+  sync: (handler, progress_handler = () ->) ->
     if @in_sync then return no
     @in_sync = yes
     @on_sync.emit 'start'
@@ -1196,7 +1253,7 @@ class DataManager
       if not err and @timeout_id
         @unschedule_sync null
       handler err, data
-    , force_clean, progress_handler
+    , progress_handler
 
   restore: (files, handler) ->
     xhr = new XMLHttpRequest()
