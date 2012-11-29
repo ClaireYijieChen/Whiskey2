@@ -7,7 +7,6 @@ import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentStatePagerAdapter;
 import android.support.v4.view.ViewPager;
-import android.util.Log;
 
 public class PagesPagerAdapter extends FragmentStatePagerAdapter {
 
@@ -22,7 +21,7 @@ public class PagesPagerAdapter extends FragmentStatePagerAdapter {
 
 	@Override
 	public Fragment getItem(int index) {
-		Log.i(TAG, "Creating page: " + index);
+		// Log.i(TAG, "Creating page: " + index);
 		return new PagerItemFragment(index, notepadID, selector.adapter);
 	}
 

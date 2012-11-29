@@ -34,7 +34,6 @@ public class PagerItemFragment extends SherlockFragment {
 	@Override
 	public void onAttach(Activity activity) {
 		super.onAttach(activity);
-		Log.i(TAG, "Attached: " + index);
 		if (null != adapter) { // Attach
 			adapter.setFragmentActive(this, true);
 		}
@@ -43,7 +42,6 @@ public class PagerItemFragment extends SherlockFragment {
 	@Override
 	public void onDetach() {
 		super.onDetach();
-		Log.i(TAG, "Detached: " + index);
 		if (null != adapter) { // Attach
 			adapter.setFragmentActive(this, false);
 		}
@@ -57,18 +55,10 @@ public class PagerItemFragment extends SherlockFragment {
 
 	@Override
 	public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-		// selector = ((PagesPagerAdapter) ((ViewPager)
-		// container).getAdapter()).getSelector();
-		Log.i(TAG, "Creating page: " + container + ", " + adapter);
+		// Log.i(TAG, "Creating page: " + container + ", " + adapter);
 		if (null == adapter) {
 			return null;
 		}
-		// if (null == selector || index >= selector.getCount()) { // Out of
-		// bounds
-		// TextView view = new TextView(getActivity());
-		// view.setText("Loading...");
-		// return view;
-		// }
 		View v = inflater.inflate(R.layout.notepad_pager_item, container, false);
 		surface = (MainSurface) v.findViewById(R.id.notepad_main_surface);
 		surface.setController(index, adapter, getActivity());
@@ -84,7 +74,6 @@ public class PagerItemFragment extends SherlockFragment {
 	}
 
 	public void refresh() {
-		Log.i(TAG, "Refresh page: " + index + ", " + surface);
 		if (null != surface) { // Have surface
 			surface.createLayout();
 		}

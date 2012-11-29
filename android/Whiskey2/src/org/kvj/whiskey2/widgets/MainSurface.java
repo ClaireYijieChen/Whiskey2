@@ -47,6 +47,8 @@ public class MainSurface extends RelativeLayout {
 	private LayoutInflater inflater = null;
 	protected NoteInfo currentNote = null;
 	private int floatButtonSize;
+	private int width = 0;
+	private int height = 0;
 
 	public MainSurface(Context context, AttributeSet attrs) {
 		super(context, attrs);
@@ -70,7 +72,11 @@ public class MainSurface extends RelativeLayout {
 		// getMeasuredHeight() + ", " + layoutCreated + ", "
 		// + getParent() + ", " + parent.getMeasuredWidth() + "x" +
 		// parent.getMeasuredHeight());
-		if (!layoutCreated) {
+		if (width <= 0 || height <= 0) {
+			width = parent.getMeasuredWidth();
+			height = parent.getMeasuredHeight();
+		}
+		if (!layoutCreated && width > 0 && height > 0) {
 			createLayout();
 		}
 	}
@@ -83,7 +89,7 @@ public class MainSurface extends RelativeLayout {
 		parent = (ViewGroup) getParent();
 	}
 
-	private void createViews(int width, int height, final PageSurface page, final SheetInfo sheet, TemplateInfo template) {
+	private void createViews(final PageSurface page, final SheetInfo sheet, TemplateInfo template) {
 		int pagesDisplayed = 1;
 		int contentWidth = template.width;
 		for (int i = 0; i < page.notes.size(); i++) {
@@ -149,7 +155,6 @@ public class MainSurface extends RelativeLayout {
 
 			@Override
 			public void onClick(View arg0) {
-				Log.i(TAG, "Click on page:");
 				page.requestFocus();
 			}
 		});
@@ -196,11 +201,6 @@ public class MainSurface extends RelativeLayout {
 	}
 
 	void createLayout() {
-		final int width = parent.getMeasuredWidth();
-		final int height = parent.getMeasuredHeight();
-		if (width <= 0 || height <= 0) { // Not ready yet
-			return;
-		}
 		layoutCreated = true;
 		currentNote = null;
 		final SheetInfo sheet = adapter.getItem(index);
@@ -220,7 +220,7 @@ public class MainSurface extends RelativeLayout {
 			@Override
 			protected void onPostExecute(List<NoteInfo> result) {
 				page.notes.addAll(result);
-				createViews(width, height, page, sheet, template);
+				createViews(page, sheet, template);
 			}
 		};
 		task.execute();
@@ -242,7 +242,7 @@ public class MainSurface extends RelativeLayout {
 	}
 
 	public void acceptDrop(PageSurface page, SheetInfo sheet, float x, float y, List<NoteInfo> notes) {
-		Log.i(TAG, "Accept drop: " + x + "x" + y + ", " + notes);
+		// Log.i(TAG, "Accept drop: " + x + "x" + y + ", " + notes);
 		int noteX = adapter.getController().stickToGrid(x * page.zoomFactor);
 		int noteY = adapter.getController().stickToGrid(y * page.zoomFactor);
 
