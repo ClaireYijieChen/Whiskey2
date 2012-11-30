@@ -1731,7 +1731,7 @@
       return _results;
     };
 
-    DataManager.prototype._save = function(stream, object, handler) {
+    DataManager.prototype.save = function(stream, object, handler) {
       var _this = this;
       if (!object.id) {
         return this.storage.create(stream, object, function(err) {

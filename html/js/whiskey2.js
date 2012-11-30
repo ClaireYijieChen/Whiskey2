@@ -3,7 +3,7 @@
     __slice = Array.prototype.slice;
 
   yepnope({
-    load: ['lib/jquery-1.8.2.min.js', 'bs/css/bootstrap.min.css', 'bs/js/bootstrap.min.js', 'lib/custom-web/date.js', 'lib/custom-web/cross-utils.js', 'lib/common-web/underscore-min.js', 'lib/common-web/underscore.strings.js', 'css/whiskey2.css', 'lib/lima1/net.js', 'lib/lima1/main.js'],
+    load: ['lib/jquery-1.8.2.min.js', 'bs/css/bootstrap.min.css', 'bs/js/bootstrap.min.js', 'lib/custom-web/date.js', 'lib/custom-web/cross-utils.js', 'lib/common-web/underscore-min.js', 'lib/common-web/underscore.strings.js', 'css/whiskey2.css', 'lib/lima1/net.js', 'lib/lima1/main.js', 'bs/js/bootstrap-colorpicker.js', 'bs/js/bootstrap-datepicker.js', 'bs/css/datepicker.css', 'bs/css/colorpicker.css'],
     complete: function() {
       return $(document).ready(function() {
         var app;
@@ -54,7 +54,9 @@
           return _this.showLoginDialog();
         };
         _this.bindMain();
-        _this.refreshNotepads();
+        _this.refreshBookmarks(function() {
+          return _this.refreshNotepads();
+        });
         return _this.sync();
       });
     };
@@ -136,6 +138,21 @@
       return offset;
     };
 
+    Whiskey2.prototype.refreshBookmarks = function(handler) {
+      var _this = this;
+      return this.manager.storage.select('bookmarks', [], function(err, data) {
+        var item, _i, _len;
+        if (err) return handler(err);
+        _this.bookmarks = {};
+        for (_i = 0, _len = data.length; _i < _len; _i++) {
+          item = data[_i];
+          if (!_this.bookmarks[item.sheet_id]) _this.bookmarks[item.sheet_id] = [];
+          _this.bookmarks[item.sheet_id].push(item);
+        }
+        return handler();
+      });
+    };
+
     Whiskey2.prototype.refreshNotepads = function(selectID) {
       var _this = this;
       return this.manager.storage.select('notepads', [
@@ -169,7 +186,7 @@
           });
           a.bind('dragenter', function(e) {
             if (_this.dragHasType(e, 'custom/notepad')) e.preventDefault();
-            if ((_this.dragHasType(e, 'custom/note')) || (_this.dragHasType(e, 'custom/sheet'))) {
+            if ((_this.dragHasType(e, 'custom/note')) || (_this.dragHasType(e, 'custom/sheet')) || (_this.dragHasType(e, 'custom/bmark'))) {
               a.tab('show');
               return e.preventDefault();
             }
@@ -477,7 +494,7 @@
         });
       });
       this.div.find('.notepad-reload-sheets').bind('click', function() {
-        return _this.reloadSheets();
+        return _this.reloadSheetsBookmarks();
       });
       this.div.find('.notepad-zoom-in').bind('click', function() {
         return _this.zoomInOut(1);
@@ -489,12 +506,54 @@
       this.reloadSheets();
     }
 
+    Notepad.prototype.reloadSheetsBookmarks = function() {
+      var _this = this;
+      return this.app.refreshBookmarks(function() {
+        return _this.reloadSheets();
+      });
+    };
+
     Notepad.prototype.zoomInOut = function(direction) {
       if (direction == null) direction = 1;
       if (direction < 0 && this.zoom <= this.zoomStep) return;
       this.zoom += direction * this.zoomStep;
       return this.divContent.css({
         'font-size': "" + this.zoom + "em"
+      });
+    };
+
+    Notepad.prototype.showBMarkDialog = function(bmark, handler) {
+      var _ref, _ref2,
+        _this = this;
+      $('#bmark-dialog').modal('show');
+      $('#bmark-dialog-name').val((_ref = bmark.name) != null ? _ref : 'Untitled').focus();
+      $('#bmark-dialog-color').val((_ref2 = bmark.color) != null ? _ref2 : '#ff0000');
+      $('#do-remove-bmark-dialog').unbind('click').bind('click', function(e) {
+        _this.app.showPrompt('Are you sure want to remove bookmark?', function() {
+          return _this.app.manager.removeCascade('bookmarks', bmark, function(err) {
+            if (err) return _this.app.showError('Error removing bookmark');
+            if (handler) return handler(bmark);
+          });
+        });
+        return $('#bmark-dialog').modal('hide');
+      });
+      return $('#do-save-bmark-dialog').unbind('click').bind('click', function(e) {
+        var color, name, _handler;
+        name = $('#bmark-dialog-name').val().trim();
+        color = $('#bmark-dialog-color').val();
+        if (!name) return _this.app.showError('Name is empty');
+        log('Save bmark', bmark, name, color);
+        bmark.name = name;
+        bmark.color = color;
+        _handler = function(err, data) {
+          if (err) return _this.app.showError(err);
+          _this.app.showAlert('Bookmark saved', {
+            severity: 'success'
+          });
+          $('#bmark-dialog').modal('hide');
+          if (handler) return handler(bmark);
+        };
+        return _this.app.manager.save('bookmarks', bmark, _handler);
       });
     };
 
@@ -576,8 +635,52 @@
       });
     };
 
+    Notepad.prototype.moveBookmark = function(id, sheet, handler) {
+      var _this = this;
+      return this.app.manager.findOne('bookmarks', id, function(err, bmark) {
+        if (err) return _this.app.showError(err);
+        bmark.sheet_id = sheet.id;
+        return _this.app.manager.save('bookmarks', bmark, function(err) {
+          if (err) return _this.app.showError(err);
+          return _this.reloadSheetsBookmarks();
+        });
+      });
+    };
+
+    Notepad.prototype.renderBookmark = function(bmark, zoom, handler) {
+      var color, div, _ref,
+        _this = this;
+      color = (_ref = bmark.color) != null ? _ref : '#ff0000';
+      div = $(document.createElement('div')).addClass('bookmark');
+      div.css({
+        'border-color': color,
+        'border-bottom-color': 'transparent',
+        'font-size': "" + zoom + "em"
+      });
+      div.attr({
+        draggable: true,
+        rel: 'tooltip',
+        title: bmark.name
+      });
+      div.tooltip({
+        placement: 'bottom'
+      });
+      div.bind('dblclick', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (handler) handler(bmark);
+        return false;
+      });
+      div.bind('dragstart', function(e) {
+        return _this.app.dragSetType(e, 'custom/bmark', {
+          id: bmark.id
+        });
+      });
+      return div;
+    };
+
     Notepad.prototype.renderSheetMiniatures = function(sheets) {
-      var div, divItem, divItemText, h, height, i, maxHeight, minHeight, oneItemHeight, sheet, step, _fn, _ref,
+      var div, divItem, divItemText, h, height, i, maxHeight, minHeight, oneItemHeight, renderBookmarks, sheet, step, _fn, _ref,
         _this = this;
       div = this.divMiniatures;
       div.empty();
@@ -594,7 +697,33 @@
       if (step > maxHeight) step = maxHeight;
       if (step < minHeight) step = minHeight;
       h = 0;
+      renderBookmarks = function(i, sheet, divItem) {
+        var arr, bmarkstep, bmarkx, bmarky, divBMark, item, _i, _len, _results;
+        arr = _this.app.bookmarks[sheet.id];
+        if (!arr) return;
+        bmarkx = 0;
+        bmarky = 0;
+        bmarkstep = 1;
+        _results = [];
+        for (_i = 0, _len = arr.length; _i < _len; _i++) {
+          item = arr[_i];
+          divBMark = _this.renderBookmark(item, 0.5, function(bmark) {
+            return _this.showBMarkDialog(bmark, function() {
+              return _this.reloadSheetsBookmarks();
+            });
+          });
+          divBMark.css({
+            top: "" + bmarkx + "em",
+            right: "" + bmarky + "em"
+          });
+          divItem.append(divBMark);
+          bmarkx += bmarkstep;
+          _results.push(bmarky -= bmarkstep);
+        }
+        return _results;
+      };
       _fn = function(i, sheet, divItem) {
+        renderBookmarks(i, sheet, divItem);
         divItem.bind('click', function(e) {
           e.preventDefault();
           if (e.ctrlKey) {
@@ -632,7 +761,13 @@
           return false;
         });
         divItem.bind('drop', function(e) {
-          var sheetsData;
+          var bmark, sheetsData;
+          bmark = _this.app.dragGetType(e, 'custom/bmark');
+          if (bmark) {
+            _this.moveBookmark(bmark.id, sheet);
+            e.stopPropagation();
+            return false;
+          }
           sheetsData = _this.app.dragGetType(e, 'custom/sheet');
           if (sheetsData) {
             _this.moveSheets(i, sheetsData);
@@ -645,6 +780,7 @@
         });
         divItem.bind('dragenter', function(e) {
           divItem.addClass('notepad-sheet-miniature-hover');
+          if (_this.app.dragHasType(e, 'custom/bmark')) e.preventDefault();
           if (_this.app.dragHasType(e, 'custom/note')) {
             _this.loadSheets(i);
             return e.preventDefault();
@@ -808,7 +944,7 @@
     };
 
     Notepad.prototype.loadNotes = function(sheet, parent) {
-      var loadNote,
+      var loadNote, renderBookmarks,
         _this = this;
       loadNote = function(note) {
         var div, i, line, lines, width, x, y, _ref, _ref2, _ref3, _ref4, _ref5, _ref6, _results;
@@ -886,17 +1022,40 @@
         }
         return _results;
       };
-      return this.app.manager.storage.select('notes', ['sheet_id', sheet.id], function(err, arr) {
-        var item, _i, _len, _results;
-        if (err) return _this.app.showError(err);
-        parent.empty();
+      renderBookmarks = function(divItem) {
+        var arr, bmarkstep, bmarkx, bmarky, divBMark, item, _i, _len, _results;
+        arr = _this.app.bookmarks[sheet.id];
+        if (!arr) return;
+        bmarkx = 0.5;
+        bmarky = 0;
+        bmarkstep = 2.5;
         _results = [];
         for (_i = 0, _len = arr.length; _i < _len; _i++) {
           item = arr[_i];
-          loadNote(item);
-          _results.push(_this.notes.push(item));
+          divBMark = _this.renderBookmark(item, 0.6, function(bmark) {
+            return _this.showBMarkDialog(bmark, function() {
+              return _this.reloadSheetsBookmarks();
+            });
+          });
+          divBMark.css({
+            top: "" + bmarky + "em",
+            right: "" + bmarkx + "em"
+          });
+          divItem.append(divBMark);
+          _results.push(bmarkx += bmarkstep);
         }
         return _results;
+      };
+      return this.app.manager.storage.select('notes', ['sheet_id', sheet.id], function(err, arr) {
+        var item, _i, _len;
+        if (err) return _this.app.showError(err);
+        parent.empty();
+        for (_i = 0, _len = arr.length; _i < _len; _i++) {
+          item = arr[_i];
+          loadNote(item);
+          _this.notes.push(item);
+        }
+        return renderBookmarks(parent);
       });
     };
 
@@ -983,6 +1142,13 @@
           return _this.reloadSheets();
         });
       });
+      div.find('.sheet-toolbar-add-bmark').unbind('click').bind('click', function() {
+        return _this.showBMarkDialog({
+          sheet_id: sheet.id
+        }, function() {
+          return _this.reloadSheetsBookmarks();
+        });
+      });
       divContent.unbind();
       divContent.bind('mousedown', function(e) {
         var coords, notes, offset, x, y, _ref2, _ref3;
@@ -1056,10 +1222,17 @@
       });
       divContent.bind('dragover', function(e) {
         if (_this.app.dragHasType(e, 'custom/note')) e.preventDefault();
+        if (_this.app.dragHasType(e, 'custom/bmark')) e.preventDefault();
         return false;
       });
       divContent.bind('drop', function(e) {
-        var config, id, offset, otherNote, x, y, _i, _len, _ref2, _ref3, _ref4;
+        var bmark, config, id, offset, otherNote, x, y, _i, _len, _ref2, _ref3, _ref4;
+        bmark = _this.app.dragGetType(e, 'custom/bmark');
+        if (bmark) {
+          _this.moveBookmark(bmark.id, sheet);
+          e.stopPropagation();
+          return false;
+        }
         if (_this.app.dragHasType(e, 'custom/note')) {
           otherNote = _this.app.dragGetType(e, 'custom/note');
           offset = _this.app.dragGetOffset(e, divContent);

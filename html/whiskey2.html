@@ -77,6 +77,31 @@
               <a href="#" class="btn btn-warning" id="do-remove-sheet-dialog">Remove</a>
           </div>
         </div>
+        <div class="modal hide" id="bmark-dialog">
+          <div class="modal-header">
+            <h3>Bookmark</h3>
+          </div>
+          <div class="modal-body">
+            <form class="form-horizontal">
+              <div class="control-group">
+                <label class="control-label" for="bmark-dialog-name">Name</label>
+                <div class="controls">
+                  <input type="text" id="bmark-dialog-name" placeholder="Name">
+                </div>
+              </div>
+              <div class="control-group">
+                <label class="control-label" for="bmark-dialog-color">Color</label>
+                <div class="controls">
+                  <input type="color" id="bmark-dialog-color" placeholder="Color">
+                </div>
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+              <a href="#" class="btn btn-primary" id="do-save-bmark-dialog">Save</a>
+              <a href="#" class="btn btn-warning" id="do-remove-bmark-dialog">Remove</a>
+          </div>
+        </div>
         <div class="modal hide" id="note-dialog">
           <div class="modal-header">
             <h3>Note</h3>
@@ -139,7 +164,7 @@
           <div class="btn-toolbar">
             <div class="btn-group">
               <a class="btn sheet-toolbar-edit" href="#"><i class="icon-pencil"></i></a>
-              <a class="btn sheet-toolbar-remove" href="#"><i class="icon-trash"></i></a>
+              <a class="btn sheet-toolbar-add-bmark" href="#"><i class="icon-bookmark"></i></a>
             </div>
           </div>
         </div>

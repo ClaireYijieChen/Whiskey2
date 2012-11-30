@@ -1,5 +1,5 @@
 yepnope({
-  load: ['lib/jquery-1.8.2.min.js', 'bs/css/bootstrap.min.css', 'bs/js/bootstrap.min.js', 'lib/custom-web/date.js', 'lib/custom-web/cross-utils.js', 'lib/common-web/underscore-min.js', 'lib/common-web/underscore.strings.js', 'css/whiskey2.css', 'lib/lima1/net.js', 'lib/lima1/main.js'],
+  load: ['lib/jquery-1.8.2.min.js', 'bs/css/bootstrap.min.css', 'bs/js/bootstrap.min.js', 'lib/custom-web/date.js', 'lib/custom-web/cross-utils.js', 'lib/common-web/underscore-min.js', 'lib/common-web/underscore.strings.js', 'css/whiskey2.css', 'lib/lima1/net.js', 'lib/lima1/main.js', 'bs/js/bootstrap-colorpicker.js', 'bs/js/bootstrap-datepicker.js', 'bs/css/datepicker.css', 'bs/css/colorpicker.css'],
   complete: ->
     $(document).ready(->
       app = new Whiskey2
@@ -34,7 +34,8 @@ class Whiskey2
       @oauth.on_token_error = =>
         @showLoginDialog()
       @bindMain()
-      @refreshNotepads()
+      @refreshBookmarks () =>
+        @refreshNotepads()
       @sync()
 
   showLoginDialog: ->
@@ -82,6 +83,16 @@ class Whiskey2
       offset.top -= div.offset().top
     return offset
 
+  refreshBookmarks: (handler) ->
+    @manager.storage.select 'bookmarks', [], (err, data) =>
+      if err then return handler(err)
+      @bookmarks = {}
+      for item in data
+        if not @bookmarks[item.sheet_id]
+          @bookmarks[item.sheet_id] = []
+        @bookmarks[item.sheet_id].push item
+      handler()
+
   refreshNotepads: (selectID) ->
     @manager.storage.select 'notepads', ['archived', {op: '<>', var: 1}], (err, arr) =>
       if err then return @showError err
@@ -111,7 +122,7 @@ class Whiskey2
           a.bind 'dragenter', (e) =>
             if @dragHasType e, 'custom/notepad'
               e.preventDefault()
-            if (@dragHasType e, 'custom/note') or (@dragHasType e, 'custom/sheet')
+            if (@dragHasType e, 'custom/note') or (@dragHasType e, 'custom/sheet') or (@dragHasType e, 'custom/bmark')
               a.tab('show')
               e.preventDefault()
           a.bind 'drop', (e) =>
@@ -306,7 +317,7 @@ class Notepad
       @showSheetDialog {}, =>
         @reloadSheets()
     @div.find('.notepad-reload-sheets').bind 'click', =>
-      @reloadSheets()
+      @reloadSheetsBookmarks()
     @div.find('.notepad-zoom-in').bind 'click', =>
       @zoomInOut 1
     @div.find('.notepad-zoom-out').bind 'click', =>
@@ -314,10 +325,38 @@ class Notepad
     @initSheetPlaceholders()
     @reloadSheets()
 
+  reloadSheetsBookmarks: ->
+    @app.refreshBookmarks () =>
+      @reloadSheets()
+
   zoomInOut: (direction = 1) ->
     if direction<0 and @zoom<=@zoomStep then return
     @zoom += direction*@zoomStep
     @divContent.css 'font-size': "#{@zoom}em"
+
+  showBMarkDialog: (bmark, handler) ->
+    $('#bmark-dialog').modal('show')
+    $('#bmark-dialog-name').val(bmark.name ? 'Untitled').focus()
+    $('#bmark-dialog-color').val(bmark.color ? '#ff0000')
+    $('#do-remove-bmark-dialog').unbind('click').bind 'click', (e) =>
+      @app.showPrompt 'Are you sure want to remove bookmark?', =>
+        @app.manager.removeCascade 'bookmarks', bmark, (err) =>
+          if err then return @app.showError 'Error removing bookmark'
+          if handler then handler bmark
+      $('#bmark-dialog').modal('hide')
+    $('#do-save-bmark-dialog').unbind('click').bind 'click', (e) =>
+      name = $('#bmark-dialog-name').val().trim()
+      color = $('#bmark-dialog-color').val()
+      if not name then return @app.showError 'Name is empty'
+      log 'Save bmark', bmark, name, color
+      bmark.name = name
+      bmark.color = color
+      _handler = (err, data) =>
+        if err then return @app.showError err
+        @app.showAlert 'Bookmark saved', severity: 'success'
+        $('#bmark-dialog').modal('hide')
+        if handler then handler bmark
+      @app.manager.save 'bookmarks', bmark, _handler
 
   showSheetDialog: (sheet, handler) ->
     $('#sheet-dialog-name').val(sheet.title ? '')
@@ -363,6 +402,29 @@ class Notepad
     , (item) =>
       item.notepad_id = @notepad.id
 
+  moveBookmark: (id, sheet, handler) ->
+    @app.manager.findOne 'bookmarks', id, (err, bmark) =>
+      if err then return @app.showError err
+      bmark.sheet_id = sheet.id
+      @app.manager.save 'bookmarks', bmark, (err) =>
+        if err then return @app.showError err
+        @reloadSheetsBookmarks()
+
+  renderBookmark: (bmark, zoom, handler) ->
+    color = bmark.color ? '#ff0000'
+    div = $(document.createElement('div')).addClass('bookmark')
+    div.css 'border-color': color, 'border-bottom-color': 'transparent', 'font-size': "#{zoom}em"
+    div.attr draggable: yes, rel: 'tooltip', title: bmark.name
+    div.tooltip placement: 'bottom'
+    div.bind 'dblclick', (e) =>
+      e.preventDefault()
+      e.stopPropagation()
+      if handler then handler(bmark)
+      return no
+    div.bind 'dragstart', (e) =>
+      @app.dragSetType e, 'custom/bmark', {id: bmark.id}
+    return div
+
   renderSheetMiniatures: (sheets) ->
     div = @divMiniatures
     div.empty()
@@ -378,6 +440,21 @@ class Notepad
     if step>maxHeight then step = maxHeight
     if step<minHeight then step = minHeight
     h = 0
+    renderBookmarks = (i, sheet, divItem) =>
+      arr = @app.bookmarks[sheet.id]
+      if not arr then return
+      bmarkx = 0
+      bmarky = 0
+      bmarkstep = 1
+      for item in arr
+        divBMark = @renderBookmark item, 0.5, (bmark) =>
+          @showBMarkDialog bmark, () =>
+            @reloadSheetsBookmarks()
+        divBMark.css top: "#{bmarkx}em", right: "#{bmarky}em"
+        divItem.append divBMark
+        bmarkx += bmarkstep
+        bmarky -= bmarkstep
+
     for i in [0...sheets.length]
       sheet = sheets[i]
       divItem = $(document.createElement('div')).addClass('notepad-sheet-miniature')
@@ -388,6 +465,7 @@ class Notepad
       divItemText.text sheet.title
       h += step
       do (i, sheet, divItem) =>
+        renderBookmarks i, sheet, divItem
         divItem.bind 'click', (e) =>
           e.preventDefault()
           if e.ctrlKey
@@ -415,6 +493,11 @@ class Notepad
             e.preventDefault()
           return no
         divItem.bind 'drop', (e) =>
+          bmark = @app.dragGetType e, 'custom/bmark'
+          if bmark
+            @moveBookmark bmark.id, sheet
+            e.stopPropagation()
+            return no
           sheetsData = @app.dragGetType e, 'custom/sheet'
           if sheetsData
             @moveSheets i, sheetsData
@@ -423,7 +506,10 @@ class Notepad
         divItem.bind 'mouseover', (e) =>
           divItem.addClass('notepad-sheet-miniature-hover')
         divItem.bind 'dragenter', (e) =>
+          #custom/bmark
           divItem.addClass('notepad-sheet-miniature-hover')
+          if @app.dragHasType e, 'custom/bmark'
+            e.preventDefault()
           if @app.dragHasType e, 'custom/note'
             @loadSheets i
             e.preventDefault()
@@ -574,12 +660,26 @@ class Notepad
         else
           $(document.createElement('div')).addClass('note-line').appendTo(div).text line
     # , 'archived', {op: '<>', var: 1}
+    renderBookmarks = (divItem) =>
+      arr = @app.bookmarks[sheet.id]
+      if not arr then return
+      bmarkx = 0.5
+      bmarky = 0
+      bmarkstep = 2.5
+      for item in arr
+        divBMark = @renderBookmark item, 0.6, (bmark) =>
+          @showBMarkDialog bmark, () =>
+            @reloadSheetsBookmarks()
+        divBMark.css top: "#{bmarky}em", right: "#{bmarkx}em"
+        divItem.append divBMark
+        bmarkx += bmarkstep
     @app.manager.storage.select 'notes', ['sheet_id', sheet.id], (err, arr) =>
       if err then return @app.showError err
       parent.empty()
       for item in arr
         loadNote item
         @notes.push item
+      renderBookmarks(parent)
   noteWidths: [50, 75, 90, 125]
   noteDefaultWidth: 1
   zoomFactor: 5
@@ -630,6 +730,9 @@ class Notepad
     div.find('.sheet-toolbar-edit').unbind('click').bind 'click', ()=>
       @showSheetDialog sheet, =>
         @reloadSheets()
+    div.find('.sheet-toolbar-add-bmark').unbind('click').bind 'click', ()=>
+      @showBMarkDialog {sheet_id: sheet.id}, =>
+        @reloadSheetsBookmarks()
     divContent.unbind()
     divContent.bind 'mousedown', (e) =>
       offset = @app.dragGetOffset e, divContent
@@ -680,8 +783,15 @@ class Notepad
     divContent.bind 'dragover', (e) =>
       if @app.dragHasType e, 'custom/note'
         e.preventDefault()
+      if @app.dragHasType e, 'custom/bmark'
+        e.preventDefault()
       return false
     divContent.bind 'drop', (e) =>
+      bmark = @app.dragGetType e, 'custom/bmark'
+      if bmark
+        @moveBookmark bmark.id, sheet
+        e.stopPropagation()
+        return no
       if @app.dragHasType e, 'custom/note'
         otherNote = @app.dragGetType e, 'custom/note'
         offset = @app.dragGetOffset e, divContent

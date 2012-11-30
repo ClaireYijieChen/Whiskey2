@@ -1224,7 +1224,7 @@ class DataManager
         else
           ag._fn null
 
-  _save: (stream, object, handler) ->
+  save: (stream, object, handler) ->
     if not object.id
       @storage.create stream, object, (err) =>
         if err then return handler err
