@@ -6,6 +6,7 @@ import org.kvj.bravo7.SuperActivity;
 import org.kvj.bravo7.form.FormController;
 import org.kvj.bravo7.form.impl.bundle.LongBundleAdapter;
 import org.kvj.bravo7.form.impl.widget.TransientAdapter;
+import org.kvj.whiskey2.data.BookmarkInfo;
 import org.kvj.whiskey2.data.DataController;
 import org.kvj.whiskey2.data.DataController.DataControllerListener;
 import org.kvj.whiskey2.data.NoteInfo;
@@ -13,9 +14,11 @@ import org.kvj.whiskey2.data.SheetInfo;
 import org.kvj.whiskey2.svc.DataService;
 import org.kvj.whiskey2.widgets.ListPageSelector;
 import org.kvj.whiskey2.widgets.ListPageSelector.PagesSelectorListener;
+import org.kvj.whiskey2.widgets.adapters.BookmarksAdapter;
 import org.kvj.whiskey2.widgets.adapters.NotebookListAdapter;
 import org.kvj.whiskey2.widgets.adapters.NotebookListAdapter.NotebookInfo;
 import org.kvj.whiskey2.widgets.adapters.PagesPagerAdapter;
+import org.kvj.whiskey2.widgets.v11.SheetListDecorator;
 
 import android.content.Intent;
 import android.os.AsyncTask;
@@ -23,6 +26,10 @@ import android.os.Bundle;
 import android.support.v4.view.ViewPager;
 import android.support.v4.view.ViewPager.OnPageChangeListener;
 import android.util.Log;
+import android.view.View;
+import android.widget.AdapterView;
+import android.widget.AdapterView.OnItemClickListener;
+import android.widget.ListView;
 
 import com.actionbarsherlock.app.ActionBar;
 import com.actionbarsherlock.app.ActionBar.OnNavigationListener;
@@ -41,6 +48,8 @@ public class NotepadActivity extends SherlockFragmentActivity implements Control
 	private DataController controller = null;
 	NotebookListAdapter notebookListAdapter = null;
 	ListPageSelector sheetSelector = null;
+	ListView bookmarkSelector = null;
+	BookmarksAdapter bookmarkAdapter = null;
 	ViewPager pager = null;
 	FormController form = null;
 	TransientAdapter<Long> notepadID = null;
@@ -99,6 +108,9 @@ public class NotepadActivity extends SherlockFragmentActivity implements Control
 				selectPage(position, true);
 			}
 		});
+		bookmarkSelector = (ListView) findViewById(R.id.notepad_bookmarks);
+		bookmarkAdapter = new BookmarksAdapter();
+		bookmarkSelector.setAdapter(bookmarkAdapter);
 		conn = new ControllerConnector<Whiskey2App, DataController, DataService>(this, this);
 		getSupportActionBar().setNavigationMode(ActionBar.NAVIGATION_MODE_LIST);
 		notebookListAdapter = new NotebookListAdapter(this);
@@ -134,6 +146,32 @@ public class NotepadActivity extends SherlockFragmentActivity implements Control
 
 			}
 		});
+		bookmarkSelector.setOnItemClickListener(new OnItemClickListener() {
+
+			@Override
+			public void onItemClick(AdapterView<?> adapter, View view, int pos, long id) {
+				BookmarkInfo bmark = bookmarkAdapter.getItem(pos);
+				int position = -1;
+				for (int i = 0; i < sheetSelector.adapter.getCount(); i++) { //
+					SheetInfo info = sheetSelector.adapter.getItem(i);
+					if (bmark.sheetID == info.id) { // Found
+						position = i;
+						break;
+					}
+				}
+				if (-1 != position) { // Select
+					sheetSelector.setSelection(position);
+					selectPage(position, true);
+				}
+			}
+		});
+		decorateBookmarkSelector();
+	}
+
+	private void decorateBookmarkSelector() {
+		if (android.os.Build.VERSION.SDK_INT >= 11) {
+			SheetListDecorator.decorateBookmarkSelector(bookmarkSelector, bookmarkAdapter, sheetSelector);
+		}
 	}
 
 	protected void notepadSelected(int position) {
@@ -256,7 +294,7 @@ public class NotepadActivity extends SherlockFragmentActivity implements Control
 	}
 
 	private void refreshNotepad() {
-		sheetSelector.adapter.update(controller, notepadID.getWidgetValue(), new Runnable() {
+		sheetSelector.adapter.update(controller, notepadID.getWidgetValue(), bookmarkAdapter, new Runnable() {
 
 			@Override
 			public void run() {
@@ -284,7 +322,7 @@ public class NotepadActivity extends SherlockFragmentActivity implements Control
 
 	@Override
 	public void dataChanged() {
-		refresh();
+		refreshNotepad();
 	}
 
 	@Override

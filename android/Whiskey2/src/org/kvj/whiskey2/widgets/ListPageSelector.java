@@ -12,7 +12,6 @@ import android.util.AttributeSet;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ListView;
-import android.widget.RelativeLayout;
 
 public class ListPageSelector extends ListView {
 
@@ -76,14 +75,12 @@ public class ListPageSelector extends ListView {
 			return;
 		}
 		collapsed = collapse;
-		RelativeLayout.LayoutParams params = (RelativeLayout.LayoutParams) getLayoutParams();
 		if (collapse) { // Collapse
-			params.width = (int) (collapsedWidth * density);
+			setVisibility(GONE);
 		} else {
-			params.width = (int) (expandedWidth * density);
+			setVisibility(VISIBLE);
 			requestFocus();
 		}
-		getParent().requestLayout();
 	}
 
 	public void addListener(PagesSelectorListener listener) {

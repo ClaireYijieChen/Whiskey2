@@ -3,7 +3,9 @@ package org.kvj.whiskey2.data;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.kvj.bravo7.ipc.RemoteServiceConnector;
 import org.kvj.lima1.sync.PJSONObject;
@@ -38,6 +40,7 @@ public class DataController {
 	public static Integer[] widths = { 50, 75, 90, 125 };
 	private int gridStep = 6;
 	List<DataControllerListener> listeners = new ArrayList<DataController.DataControllerListener>();
+	Map<Long, List<BookmarkInfo>> bookmarks = new HashMap<Long, List<BookmarkInfo>>();
 
 	public DataController(Whiskey2App whiskey2App) {
 		this.app = whiskey2App;
@@ -60,6 +63,7 @@ public class DataController {
 			@Override
 			public void onConnect() {
 				Log.i(TAG, "Remote Service connected");
+				refreshBookmarks();
 				synchronized (connectorLock) { // Notify
 					connectorLock.notifyAll();
 				}
@@ -90,12 +94,41 @@ public class DataController {
 		return connector.getRemote();
 	}
 
+	public void refreshBookmarks() {
+		SyncService svc = getRemote();
+		if (null == svc) { // No connection
+			Log.w(TAG, "No service");
+			return;
+		}
+		synchronized (bookmarks) { // Lock bookmarks
+			try { //
+				PJSONObject[] list = svc.query("bookmarks", new QueryOperator[0], null, null);
+				bookmarks.clear();
+				for (PJSONObject obj : list) { // Fill structure
+					BookmarkInfo info = BookmarkInfo.fromJSON(obj);
+					List<BookmarkInfo> infos = bookmarks.get(info.sheetID);
+					if (null == infos) { // New - create
+						infos = new ArrayList<BookmarkInfo>();
+						bookmarks.put(info.sheetID, infos);
+					}
+					infos.add(info);
+				}
+			} catch (Exception e) {
+				Log.e(TAG, "Error updating bookmarks:", e);
+			}
+		}
+	}
+
 	public String sync() {
 		if (null == getRemote()) { // No connection
 			return "No connection";
 		}
 		try {
-			return getRemote().sync();
+			String result = getRemote().sync();
+			if (null == result) { // Refresh bookmarks
+				refreshBookmarks();
+			}
+			return result;
 		} catch (RemoteException e) {
 			Log.e(TAG, "Error syncing:", e);
 			return "Application error";
@@ -267,6 +300,15 @@ public class DataController {
 
 	}
 
+	public void notifyDataChanged() {
+		synchronized (listeners) { // Lock for modifications
+			for (DataControllerListener l : listeners) { // Notify
+				l.dataChanged();
+			}
+		}
+
+	}
+
 	public boolean saveNote(NoteInfo info) {
 		SyncService svc = getRemote();
 		if (null == svc) { // No connection
@@ -322,5 +364,33 @@ public class DataController {
 
 	public int stickToGrid(float value) {
 		return Math.round(value / gridStep) * gridStep;
+	}
+
+	public List<BookmarkInfo> getBookmarks(long sheetID) {
+		synchronized (bookmarks) { // Lock
+			return bookmarks.get(sheetID);
+		}
+	}
+
+	public boolean moveBookmark(SheetInfo sheet, BookmarkInfo bmark) {
+		SyncService svc = getRemote();
+		if (null == svc) { // No connection
+			Log.w(TAG, "No service");
+			return false;
+		}
+		try { // Remote and JSON errors
+			PJSONObject sheetObject = findOne("sheets", sheet.id);
+			PJSONObject bmarkObject = findOne("bookmarks", bmark.id);
+			if (null == bmarkObject || null == sheetObject) { // Invalid data
+				Log.e(TAG, "Object not found: " + sheetObject + ", " + bmarkObject);
+				return false;
+			}
+			bmarkObject.put("sheet_id", sheet.id);
+			svc.update("bookmarks", bmarkObject);
+			return true;
+		} catch (Exception e) {
+			Log.e(TAG, "Error saving note:", e);
+		}
+		return false;
 	}
 }

@@ -1,5 +1,6 @@
 package org.kvj.whiskey2.widgets.adapters;
 
+import org.kvj.bravo7.adapter.AnotherArrayAdapter;
 import org.kvj.whiskey2.R;
 
 import android.view.View;

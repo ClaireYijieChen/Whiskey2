@@ -6,8 +6,10 @@ import java.util.List;
 import java.util.Set;
 
 import org.kvj.whiskey2.R;
+import org.kvj.whiskey2.data.BookmarkInfo;
 import org.kvj.whiskey2.data.DataController;
 import org.kvj.whiskey2.data.SheetInfo;
+import org.kvj.whiskey2.widgets.BookmarkSign;
 import org.kvj.whiskey2.widgets.ListPageSelector;
 import org.kvj.whiskey2.widgets.PagerItemFragment;
 import org.kvj.whiskey2.widgets.v11.SheetListDecorator;
@@ -15,19 +17,29 @@ import org.kvj.whiskey2.widgets.v11.SheetListDecorator;
 import android.content.Context;
 import android.database.DataSetObserver;
 import android.os.AsyncTask;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ListAdapter;
+import android.widget.RelativeLayout;
+import android.widget.RelativeLayout.LayoutParams;
 import android.widget.TextView;
 
 public class SheetsAdapter implements ListAdapter {
 
+	protected static final String TAG = "Sheets";
 	private ListPageSelector selector = null;
+	private float bookmarkWidth = 1;
+	private int textPadding;
+	private int bmarkGap;
 
 	public SheetsAdapter(ListPageSelector selector) {
 		this.selector = selector;
 		selector.setAdapter(this);
+		bookmarkWidth = selector.getResources().getDimensionPixelSize(R.dimen.list_item_height) / 2;
+		textPadding = selector.getResources().getDimensionPixelSize(R.dimen.list_item_padding);
+		bmarkGap = selector.getResources().getDimensionPixelSize(R.dimen.list_item_padding);
 	}
 
 	List<SheetInfo> data = new ArrayList<SheetInfo>();
@@ -66,9 +78,27 @@ public class SheetsAdapter implements ListAdapter {
 					Context.LAYOUT_INFLATER_SERVICE);
 			view = inflater.inflate(R.layout.sheet_item, group, false);
 		}
+		RelativeLayout layout = (RelativeLayout) view;
 		decorate(this, view, index);
 		TextView textView = (TextView) view.findViewById(R.id.sheet_item_title);
 		textView.setText(info.title);
+		RelativeLayout.LayoutParams textParams = (LayoutParams) textView.getLayoutParams();
+		List<BookmarkInfo> bmarks = controller.getBookmarks(info.id);
+		int rightMargin = textPadding;
+		layout.removeViews(1, layout.getChildCount() - 1);
+		if (null != bmarks) { // Add bmarks
+			for (BookmarkInfo bmark : bmarks) { //
+				RelativeLayout.LayoutParams params = new LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT,
+						RelativeLayout.LayoutParams.WRAP_CONTENT);
+				BookmarkSign sign = new BookmarkSign(group.getContext(), bookmarkWidth, bmark.color);
+				params.rightMargin = rightMargin;
+				params.addRule(RelativeLayout.ALIGN_PARENT_TOP);
+				params.addRule(RelativeLayout.ALIGN_PARENT_RIGHT);
+				rightMargin += bookmarkWidth + bmarkGap;
+				layout.addView(sign, params);
+			}
+		}
+		textParams.rightMargin = rightMargin;
 		return view;
 	}
 
@@ -113,9 +143,11 @@ public class SheetsAdapter implements ListAdapter {
 		return true;
 	}
 
-	public void update(final DataController controller, final long notepadID, final Runnable finishCallback) {
+	public void update(final DataController controller, final long notepadID, final BookmarksAdapter bookmarkAdapter,
+			final Runnable finishCallback) {
 		this.controller = controller;
 		final List<SheetInfo> newData = new ArrayList<SheetInfo>();
+		final List<BookmarkInfo> bookmarks = new ArrayList<BookmarkInfo>();
 		AsyncTask<Void, Void, Void> task = new AsyncTask<Void, Void, Void>() {
 
 			@Override
@@ -123,7 +155,15 @@ public class SheetsAdapter implements ListAdapter {
 				try { //
 					List<SheetInfo> sheets = controller.getSheets(notepadID);
 					newData.addAll(sheets);
+					for (SheetInfo sheet : newData) { // Create bookmarks
+						List<BookmarkInfo> list = controller.getBookmarks(sheet.id);
+						if (null != list) { // Have bookmarks
+							bookmarks.addAll(list);
+						}
+					}
+					Log.i(TAG, "After sheets load: " + newData.size() + ", " + bookmarks.size());
 				} catch (Exception e) {
+					e.printStackTrace();
 				}
 				return null;
 			}
@@ -134,8 +174,9 @@ public class SheetsAdapter implements ListAdapter {
 				data.addAll(newData);
 				if (null != observer) { // Have observer
 					observer.onChanged();
-					finishCallback.run();
 				}
+				bookmarkAdapter.setData(bookmarks);
+				finishCallback.run();
 			}
 		};
 		task.execute();

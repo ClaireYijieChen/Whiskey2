@@ -2,11 +2,14 @@ package org.kvj.whiskey2.widgets;
 
 import java.util.List;
 
+import org.kvj.bravo7.SuperActivity;
 import org.kvj.whiskey2.R;
+import org.kvj.whiskey2.data.BookmarkInfo;
 import org.kvj.whiskey2.data.NoteInfo;
 import org.kvj.whiskey2.data.SheetInfo;
 import org.kvj.whiskey2.data.TemplateInfo;
 import org.kvj.whiskey2.widgets.adapters.SheetsAdapter;
+import org.kvj.whiskey2.widgets.v11.BookmarkDnDDecorator;
 import org.kvj.whiskey2.widgets.v11.NoteDnDDecorator;
 import org.kvj.whiskey2.widgets.v11.PageDnDDecorator;
 
@@ -32,6 +35,8 @@ public class MainSurface extends RelativeLayout {
 	public static final int TEXT_PADDING = 1;
 	private static final float TEXT_SIZE = 5;
 	private static final float COLLPASED_HEIGHT = (float) 8.5;
+	private static final float BOOKMARK_WIDTH = 7;
+	private static final float BOOKMARK_GAP = 2;
 
 	private boolean layoutCreated = false;
 	private float density = 1;
@@ -180,6 +185,29 @@ public class MainSurface extends RelativeLayout {
 			info.widget = view;
 			decorateNoteView(view, info);
 		}
+		List<BookmarkInfo> bmarks = adapter.getController().getBookmarks(sheet.id);
+		if (null != bmarks) { // Have bookmarks -> create
+			int bmarkWidth = (int) (BOOKMARK_WIDTH / page.zoomFactor);
+			int bmarkGap = (int) (BOOKMARK_GAP / page.zoomFactor);
+			int leftBMark = (int) (pageWidth - bmarkGap - bmarkWidth);
+			for (final BookmarkInfo info : bmarks) { // Create bookmarks
+				RelativeLayout.LayoutParams bmarkParams = new RelativeLayout.LayoutParams(
+						RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
+				bmarkParams.topMargin = page.marginTop;
+				bmarkParams.leftMargin = page.marginLeft + leftBMark;
+				BookmarkSign sign = new BookmarkSign(getContext(), bmarkWidth, info.color);
+				addView(sign, bmarkParams);
+				leftBMark -= bmarkGap + bmarkWidth;
+				decorateBookmark(sheet, info, sign);
+				sign.setOnClickListener(new OnClickListener() {
+
+					@Override
+					public void onClick(View v) {
+						SuperActivity.notifyUser(getContext(), info.name);
+					}
+				});
+			}
+		}
 		toolbar = (ViewGroup) inflater.inflate(R.layout.float_note_toolbar, this, false);
 		addToolbarButton(R.drawable.float_edit, new OnClickListener() {
 
@@ -192,6 +220,12 @@ public class MainSurface extends RelativeLayout {
 		});
 		toolbar.setVisibility(View.GONE);
 		addView(toolbar, toolbarParams);
+	}
+
+	private void decorateBookmark(SheetInfo sheet, BookmarkInfo bmark, BookmarkSign sign) {
+		if (android.os.Build.VERSION.SDK_INT >= 11) {
+			BookmarkDnDDecorator.decorate(sign, sheet, bmark);
+		}
 	}
 
 	private void decorateNoteView(TextView view, NoteInfo info) {
@@ -236,7 +270,7 @@ public class MainSurface extends RelativeLayout {
 
 	private void decorate(PageSurface surface, SheetInfo info) {
 		if (android.os.Build.VERSION.SDK_INT >= 11) {
-			new PageDnDDecorator(this, surface, info);
+			PageDnDDecorator.decorate(this, surface, info);
 		}
 
 	}
@@ -313,5 +347,15 @@ public class MainSurface extends RelativeLayout {
 	private void startEditor(NoteInfo info) {
 		DialogFragment fragment = EditorDialogFragment.newInstance(info);
 		fragment.show(activity.getSupportFragmentManager(), "editor");
+	}
+
+	public void acceptBookmarkDrop(SheetInfo sheet, BookmarkInfo bmark) {
+		Log.i(TAG, "Drop bookmark: " + sheet.title + ", " + bmark.name);
+		if (adapter.getController().moveBookmark(sheet, bmark)) {
+			Log.i(TAG, "Saved OK");
+			adapter.getController().notifyDataChanged();
+		} else {
+			Log.i(TAG, "Saved ERR");
+		}
 	}
 }
