@@ -41,6 +41,7 @@ public class DataController {
 	private int gridStep = 6;
 	List<DataControllerListener> listeners = new ArrayList<DataController.DataControllerListener>();
 	Map<Long, List<BookmarkInfo>> bookmarks = new HashMap<Long, List<BookmarkInfo>>();
+	Map<Long, TemplateInfo> templates = new HashMap<Long, TemplateInfo>();
 
 	public DataController(Whiskey2App whiskey2App) {
 		this.app = whiskey2App;
@@ -64,6 +65,7 @@ public class DataController {
 			public void onConnect() {
 				Log.i(TAG, "Remote Service connected");
 				refreshBookmarks();
+				refreshTemplates();
 				synchronized (connectorLock) { // Notify
 					connectorLock.notifyAll();
 				}
@@ -119,6 +121,26 @@ public class DataController {
 		}
 	}
 
+	public void refreshTemplates() {
+		SyncService svc = getRemote();
+		if (null == svc) { // No connection
+			Log.w(TAG, "No service");
+			return;
+		}
+		synchronized (templates) { // Lock templates
+			try { //
+				PJSONObject[] list = svc.query("templates", new QueryOperator[0], null, null);
+				templates.clear();
+				for (PJSONObject obj : list) { // Fill structure
+					TemplateInfo info = TemplateInfo.fromJSON(obj);
+					templates.put(info.id, info);
+				}
+			} catch (Exception e) {
+				Log.e(TAG, "Error getting templates:", e);
+			}
+		}
+	}
+
 	public String sync() {
 		if (null == getRemote()) { // No connection
 			return "No connection";
@@ -127,6 +149,7 @@ public class DataController {
 			String result = getRemote().sync();
 			if (null == result) { // Refresh bookmarks
 				refreshBookmarks();
+				refreshTemplates();
 			}
 			return result;
 		} catch (RemoteException e) {
@@ -253,6 +276,12 @@ public class DataController {
 	}
 
 	public TemplateInfo getTemplate(long templateID) {
+		synchronized (templates) {
+			TemplateInfo info = templates.get(templateID);
+			if (null != info) {
+				return info;
+			}
+		}
 		return defaultTemplate;
 	}
 
@@ -387,6 +416,7 @@ public class DataController {
 			}
 			bmarkObject.put("sheet_id", sheet.id);
 			svc.update("bookmarks", bmarkObject);
+			refreshBookmarks();
 			return true;
 		} catch (Exception e) {
 			Log.e(TAG, "Error saving note:", e);

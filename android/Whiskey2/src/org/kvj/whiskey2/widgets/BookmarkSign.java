@@ -39,6 +39,7 @@ public class BookmarkSign extends View {
 	}
 
 	private void init() {
+		paint.setAntiAlias(true);
 		path = new Path();
 		path.moveTo(0, 0);
 		path.lineTo(zoom, 0);

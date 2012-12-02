@@ -51,7 +51,9 @@ public class NotebookListAdapter extends ArrayAdapter<NotebookInfo> {
 
 			@Override
 			protected void onPostExecute(java.util.List<NotebookInfo> result) {
-				addAll(result);
+				for (NotebookInfo info : result) {
+					add(info);
+				}
 				finishCallback.run();
 			};
 		}.execute();

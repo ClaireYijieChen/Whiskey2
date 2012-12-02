@@ -35,7 +35,7 @@ public class MainSurface extends RelativeLayout {
 	public static final int TEXT_PADDING = 1;
 	private static final float TEXT_SIZE = 5;
 	private static final float COLLPASED_HEIGHT = (float) 8.5;
-	private static final float BOOKMARK_WIDTH = 7;
+	private static final float BOOKMARK_WIDTH = 6;
 	private static final float BOOKMARK_GAP = 2;
 
 	private boolean layoutCreated = false;
@@ -74,8 +74,8 @@ public class MainSurface extends RelativeLayout {
 	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
 		super.onMeasure(widthMeasureSpec, heightMeasureSpec);
 		// Log.i(TAG, "On measure: " + getMeasuredWidth() + "x" +
-		// getMeasuredHeight() + ", " + layoutCreated + ", "
-		// + getParent() + ", " + parent.getMeasuredWidth() + "x" +
+		// getMeasuredHeight() + ", " + layoutCreated + ", " +
+		// parent.getMeasuredWidth() + "x" +
 		// parent.getMeasuredHeight());
 		if (width <= 0 || height <= 0) {
 			width = parent.getMeasuredWidth();
@@ -115,14 +115,16 @@ public class MainSurface extends RelativeLayout {
 			// Recalculate height
 			pageHeight = pageWidth * contentHeight / contentWidth;
 		}
-		// Log.i(TAG, "Calc page size pass 2: " + pageWidth + "x" + pageHeight +
-		// ", " + density);
 		float zoomFactor = contentWidth / pageWidth;
-		if (zoomFactor > 0.1 * density) { //
-			zoomFactor = (float) (0.1 * density);
-			pageWidth = contentWidth / zoomFactor;
-			pageHeight = contentHeight / zoomFactor;
-		}
+		// Log.i(TAG, "Calc page size pass 2: " + pageWidth + "x" + pageHeight +
+		// ", " + width + "x" + height + " " + zoomFactor + ", " + density);
+		// if (zoomFactor > 0.2 / density) { //
+		// zoomFactor = (float) (0.2 / density);
+		// pageWidth = contentWidth / zoomFactor;
+		// pageHeight = contentHeight / zoomFactor;
+		// }
+		// Log.i(TAG, "Calc page size pass 3: " + pageWidth + "x" + pageHeight +
+		// ", " + width + "x" + height);
 		int leftGap = 0;
 		int left = (int) ((width - pageWidth) / 2);
 		if (left < floatButtonSize) {
@@ -136,7 +138,8 @@ public class MainSurface extends RelativeLayout {
 		if (top < 0) { // Too big
 			top = 0;
 		}
-		RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams((int) pageWidth, (int) pageHeight);
+		RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams((int) (template.width / zoomFactor),
+				(int) (template.height / zoomFactor));
 		page.title = adapter.getItem(index).title;
 		page.marginLeft = left;
 		page.index = index;
@@ -189,7 +192,7 @@ public class MainSurface extends RelativeLayout {
 		if (null != bmarks) { // Have bookmarks -> create
 			int bmarkWidth = (int) (BOOKMARK_WIDTH / page.zoomFactor);
 			int bmarkGap = (int) (BOOKMARK_GAP / page.zoomFactor);
-			int leftBMark = (int) (pageWidth - bmarkGap - bmarkWidth);
+			int leftBMark = (int) (template.width / page.zoomFactor - bmarkGap - bmarkWidth);
 			for (final BookmarkInfo info : bmarks) { // Create bookmarks
 				RelativeLayout.LayoutParams bmarkParams = new RelativeLayout.LayoutParams(
 						RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
@@ -242,7 +245,7 @@ public class MainSurface extends RelativeLayout {
 			return;
 		}
 		final PageSurface page = new PageSurface(getContext());
-		final TemplateInfo template = adapter.getController().getTemplate(0);
+		final TemplateInfo template = adapter.getController().getTemplate(sheet.templateID);
 		AsyncTask<Void, Void, List<NoteInfo>> task = new AsyncTask<Void, Void, List<NoteInfo>>() {
 
 			@Override
@@ -309,12 +312,20 @@ public class MainSurface extends RelativeLayout {
 		params.topMargin = (int) (info.y / page.zoomFactor + page.marginTop);
 		textView.setBackgroundResource(adapter.getController().getBackgroundDrawable(info.color));
 		int textPadding = (int) (TEXT_PADDING / page.zoomFactor);
-		textView.setPadding(textPadding, textPadding, textPadding, textPadding);
+		textView.setPadding(textPadding, textPadding, textPadding,
+				textPadding);
 		textView.setTextSize(TypedValue.COMPLEX_UNIT_PX, TEXT_SIZE / page.zoomFactor);
 		textView.setFocusable(true);
 		textView.setFocusableInTouchMode(true);
 		textView.setText(info.text);
 		addView(textView, params);
+		textView.setOnClickListener(new OnClickListener() {
+
+			@Override
+			public void onClick(View v) {
+				textView.requestFocus();
+			}
+		});
 		textView.setOnFocusChangeListener(new OnFocusChangeListener() {
 
 			@Override

@@ -54,10 +54,6 @@ public class SheetListDecorator {
 						return true;
 					}
 					break;
-				case DragEvent.ACTION_DRAG_ENTERED:
-					// Select me
-					sheetsAdapter.getSelector().notifyPageSelected(position, sheetsAdapter.getItemId(position));
-					return true;
 				}
 				return false;
 			}

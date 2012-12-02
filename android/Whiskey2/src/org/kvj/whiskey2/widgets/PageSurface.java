@@ -37,6 +37,7 @@ public class PageSurface extends View {
 
 	public PageSurface(Context context) {
 		super(context);
+		paint.setAntiAlias(true);
 		density = getContext().getResources().getDisplayMetrics().density;
 		setFocusable(true);
 		setFocusableInTouchMode(true);
