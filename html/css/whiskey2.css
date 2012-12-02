@@ -222,3 +222,43 @@
     z-index: 2;
     cursor: pointer;
 }
+
+.templates-root {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  top: 120px;
+  bottom: 0;
+}
+
+.templates-list {
+  position: absolute;
+  width: 230px;
+  overflow: auto;
+  top: 0;
+  bottom: 0;
+  left: 0;
+}
+
+.templates-content {
+  left: 250px;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  position: absolute;
+  overflow: auto;
+}
+
+.template-buttons {
+    padding-left: 7em;
+}
+
+.templates-list-well {
+    margin-top: 1em;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+#template-config {
+    font-family: monospace;
+}

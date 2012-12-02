@@ -36,6 +36,7 @@ class Whiskey2
       @bindMain()
       @refreshBookmarks () =>
         @refreshNotepads()
+        @refreshTemplates()
       @sync()
 
   showLoginDialog: ->
@@ -43,6 +44,8 @@ class Whiskey2
     $('#main-login-dialog').modal('show')
 
   bindMain: ->
+    templatesManager = new TemplateManager(this)
+    @templatesManager = templatesManager
     $('#main-sync').bind 'click', =>
       @sync()
     $('#main-do-login').bind 'click', =>
@@ -56,6 +59,7 @@ class Whiskey2
       @doAddNotepad()
     $('#main-tab-templates a').bind 'click', ->
       $(this).tab('show')
+      templatesManager.refresh()
 
   dragSetType: (e, type, value) ->
     if e?.originalEvent?.dataTransfer?.setData
@@ -82,6 +86,16 @@ class Whiskey2
       offset.left -= div.offset().left
       offset.top -= div.offset().top
     return offset
+
+  refreshTemplates: (handler) ->
+    @manager.storage.select 'templates', [], (err, data) =>
+      if err
+        if handler then handler(err)
+        return
+      @templates = {}
+      for item in data
+        @templates[item.id] = item
+      if handler then handler()
 
   refreshBookmarks: (handler) ->
     @manager.storage.select 'bookmarks', [], (err, data) =>
@@ -171,6 +185,7 @@ class Whiskey2
     @manager.sync (err) =>
       if err then return @showError err
       # @showAlert 'Sync done'
+      @refreshTemplates()
     , (type) =>
       w = 100
       switch type
@@ -207,8 +222,11 @@ class Whiskey2
   emptyTemplate: {
     width: 100
     height: 141
+    name: 'No template'
   }
   getTemplate: (id) ->
+    tmpl = @templates[id]
+    if tmpl then return tmpl
     return @emptyTemplate
 
   findByID: (arr, id, attr = 'id') ->
@@ -359,16 +377,20 @@ class Notepad
       @app.manager.save 'bookmarks', bmark, _handler
 
   showSheetDialog: (sheet, handler) ->
-    $('#sheet-dialog-name').val(sheet.title ? '')
     $('#sheet-dialog').modal('show')
+    templateID = sheet.template_id ? null
+    $('#sheet-dialog-name').val(sheet.title ? '').focus().select()
     $('#do-remove-sheet-dialog').unbind('click').bind 'click', (e) =>
       if not sheet.id then return
       @app.showPrompt 'Are you sure want to remove sheet? It will remove notes also', =>
         @removeSheets [sheet.id]
       $('#sheet-dialog').modal('hide')
+      return no
     $('#do-save-sheet-dialog').unbind('click').bind 'click', (e) =>
       name = $('#sheet-dialog-name').val().trim()
+      log 'Save sheet', name, templateID
       if not name then return @app.showError 'Title is empty'
+      sheet.template_id = templateID
       sheet.title = name
       _handler = (err, data) =>
         if err then return @app.showError err
@@ -380,6 +402,23 @@ class Notepad
         @app.manager.storage.create 'sheets', sheet, _handler
       else
         @app.manager.storage.update 'sheets', sheet, _handler
+      return no
+    templateButtonText = $('#sheet-dialog-template-title')
+    ul = $('#sheet-dialog-template-menu').empty()
+    @app.manager.storage.select 'templates', [], (err, data) =>
+      if err then return
+      ul.empty()
+      for item in data
+        li = $(document.createElement('li')).appendTo(ul)
+        a = $(document.createElement('a')).appendTo(li)
+        a.text item.name
+        do (a, item) =>
+          a.bind 'click', (e) =>
+            templateID = item.id
+            templateButtonText.text(item.name)
+        if templateID is item.id
+          templateButtonText.text(item.name)
+    , {order: ['tag', 'name']}
 
   removeSheets: (ids) ->
     sink = []
@@ -829,3 +868,121 @@ class Notepad
       return false
     @loadNotes sheet, divContent
     return div
+
+class TemplateManager
+  
+  constructor: (@app) ->
+    $('.templates-add').bind 'click', () =>
+      @edit()
+      return no
+    $('.template-save').bind 'click', () =>
+      @save()
+      return no
+    $('.template-remove').bind 'click', () =>
+      @remove()
+      return no
+    $('.template-clone').bind 'click', () =>
+      @clone()
+      return no
+    @editName = $('#template-name')
+    @editTag = $('#template-tag')
+    @editWidth = $('#template-width')
+    @editHeight = $('#template-height')
+    @editType = $('#template-type')
+    @editConfig = $('#template-config')
+    @disableForm()
+    
+  disableForm: ->
+    form = $('.template-form')
+    form.find('input, button, textarea').attr disabled: 'disabled'
+    form.find('input, textarea').val ''
+  
+  enableForm: ->
+    form = $('.template-form')
+    form.find('input, textarea').attr disabled: null
+
+  clone: ->
+    delete @selected.id
+    @selected.name = 'Copy of '+@selected.name
+    @app.manager.save 'templates', @selected, (err) =>
+      if err then return @app.showError err
+      @refresh()
+      @edit @selected
+      @app.refreshTemplates()
+
+  remove: ->
+    @app.showPrompt 'Are you sure want to remove template? It\'ll reset template of associated sheets', =>
+      @app.manager.storage.select 'sheets', ['template_id', @selected.id], (err, data) =>
+        if err then return @app.showError err
+        config = []
+        for sheet in data
+          delete sheet.template_id
+          config.push type: 'update', stream: 'sheets', object: sheet
+        config.push type: 'removeCascade', stream: 'templates', object: @selected
+        @app.manager.batch config, (err) =>
+          if err then return @app.showError err
+          @selected = null
+          @refresh()
+          @app.refreshTemplates()
+  save: ->
+    name = @editName.val().trim()
+    if not name
+      return @app.showError 'Name is empty'
+    config = {}
+    try
+      config = JSON.parse @editConfig.val()
+    catch e
+      return @app.showError 'Config is not JSON'
+    @selected.name = name
+    @selected.tag = @editTag.val().trim()
+    @selected.width = parseInt(@editWidth.val()) ? @selected.width
+    @selected.height = parseInt(@editHeight.val()) ? @selected.height
+    @selected.type = @editType.val().trim()
+    @selected.config = config
+    @app.manager.save 'templates', @selected, (err) =>
+      if err then return @app.showError err
+      @refresh()
+      @edit @selected
+      @app.refreshTemplates()
+
+  edit: (template = {width: 100, height: 141}) ->
+    @enableForm()
+    log 'edit', template
+    $('.template-save').attr disabled: null
+    if template.id
+      #edit
+      $('.template-remove').attr disabled: null
+      $('.template-clone').attr disabled: null
+    else
+      $('.template-remove').attr disabled: 'disabled'
+      $('.template-clone').attr disabled: 'disabled'
+    @selected = template
+    @editName.val(template.name ? 'Untitled').focus().select()
+    @editTag.val(template.tag ? '')
+    @editWidth.val(template.width ? 0)
+    @editHeight.val(template.height ? 0)
+    @editType.val(template.type ? '')
+    @editConfig.val(if template.config then JSON.stringify(template.config) else '{}')
+  
+  refresh: (selectID) ->
+    ul = $('.templates-list-ul')
+    @app.manager.storage.select 'templates', [], (err, data) =>
+      if err then return @app.showError err
+      ul.empty()
+      found = no
+      for item in data
+        li = $(document.createElement('li'))
+        if @selected?.id is item.id
+          found = yes
+          li.addClass('active')
+        a = $(document.createElement('a')).attr 'href': '#'
+        a.text(item.name)
+        a.appendTo li
+        li.appendTo ul
+        do (item, li) =>
+          a.bind 'click', (e) =>
+            @edit item
+            @refresh()
+            return no
+      if not found then @disableForm()
+    , order: ['tag', 'name']

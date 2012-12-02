@@ -26,7 +26,54 @@
               </ul>
               <div class="tab-content" id="main-tabs-content">
                 <div class="tab-pane" id="main-tab-content-templates">
-                  Templates content
+                    <div class="templates-root">
+                      <div class="templates-list">
+                        <button class="btn btn-success templates-add">New template</button>
+                        <div class="well templates-list-well">
+                          <ul class="nav nav-list templates-list-ul"></ul>
+                        </div>
+                      </div>
+                      <div class="templates-content">
+                        <form class="form-horizontal template-form">
+                          <div class="control-group">
+                            <label class="control-label" for="template-name">Name</label>
+                            <div class="controls">
+                                <input type="text" id="template-name" placeholder="Name" class="input-xlarge">
+                            </div>
+                          </div>
+                          <div class="control-group">
+                            <label class="control-label" for="template-tag">Tag</label>
+                            <div class="controls">
+                                <input type="text" id="template-tag" placeholder="Tag" class="input-xlarge">
+                            </div>
+                          </div>
+                          <div class="control-group">
+                            <label class="control-label" for="template-width">Size</label>
+                            <div class="controls">
+                                <input type="number" id="template-width" placeholder="Width" class="input-small">
+                                <input type="number" id="template-height" placeholder="Height" class="input-small">
+                            </div>
+                          </div>
+                          <div class="control-group">
+                            <label class="control-label" for="template-type">Type</label>
+                            <div class="controls">
+                                <input type="text" id="template-type" placeholder="Type" class="input-xlarge">
+                            </div>
+                          </div>
+                          <div class="control-group">
+                            <label class="control-label" for="template-config">Configuration</label>
+                            <div class="controls">
+                                <textarea id="template-config" rows="10" placeholder="Config" class="input-xlarge"></textarea>
+                            </div>
+                          </div>
+                          <div class="control-group template-buttons">
+                            <button class="btn btn-primary template-save">Save</button>
+                            <button class="btn btn-info template-clone">Clone</button>
+                            <button class="btn btn-danger template-remove">Remove</button>
+                          </div>
+                        </form>
+                      </div>
+                    </div>
                 </div>
               </div>
             </div>
@@ -58,11 +105,11 @@
               <a href="#" class="btn" id="main-do-login-close">Close</a>
           </div>
         </div>
-        <div class="modal hide fade" id="sheet-dialog">
+        <div class="modal hide" id="sheet-dialog">
           <div class="modal-header">
             <h3>Sheet</h3>
           </div>
-          <div class="modal-body">
+          <div class="modal-body" style="overflow: visible;">
             <form class="form-horizontal">
               <div class="control-group">
                 <label class="control-label" for="sheet-dialog-name">Title</label>
@@ -70,11 +117,20 @@
                   <input type="text" id="sheet-dialog-name" placeholder="Title">
                 </div>
               </div>
+              <div class="control-group">
+                <label class="control-label" for="sheet-dialog-template">Template</label>
+                <div class="controls">
+                  <div class="btn-group">
+                    <a href="#" class="btn btn-primary dropdown-toggle" data-toggle="dropdown" id="sheet-dialog-template"><span id="sheet-dialog-template-title">No template</span> <span class="caret"></span></a>
+                    <ul class="dropdown-menu" id="sheet-dialog-template-menu" role="menu"></ul>
+                  </div>
+                </div>
+              </div>
             </form>
           </div>
           <div class="modal-footer">
               <a href="#" class="btn btn-primary" id="do-save-sheet-dialog">Save</a>
-              <a href="#" class="btn btn-warning" id="do-remove-sheet-dialog">Remove</a>
+              <a href="#" class="btn btn-danger" id="do-remove-sheet-dialog">Remove</a>
           </div>
         </div>
         <div class="modal hide" id="bmark-dialog">
@@ -99,7 +155,7 @@
           </div>
           <div class="modal-footer">
               <a href="#" class="btn btn-primary" id="do-save-bmark-dialog">Save</a>
-              <a href="#" class="btn btn-warning" id="do-remove-bmark-dialog">Remove</a>
+              <a href="#" class="btn btn-danger" id="do-remove-bmark-dialog">Remove</a>
           </div>
         </div>
         <div class="modal hide" id="note-dialog">
