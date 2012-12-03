@@ -29,10 +29,15 @@ import android.widget.TextView;
 
 public class MainSurface extends RelativeLayout {
 
+	public static interface OnPageZoomListener {
+		public void onShow();
+	}
+
 	private static final String TAG = "MainSurface";
 	public static final int PAGE_MARGIN = 15;
 	public static final int PAGES_GAP = 10;
 	public static final int TEXT_PADDING = 1;
+	static final float ZOOM_STEP = 0.05f;
 	private static final float TEXT_SIZE = 5;
 	private static final float COLLPASED_HEIGHT = (float) 8.5;
 	private static final float BOOKMARK_WIDTH = 6;
@@ -40,6 +45,8 @@ public class MainSurface extends RelativeLayout {
 
 	private boolean layoutCreated = false;
 	private float density = 1;
+	float zoom = 1.0f;
+
 	private float pageMargin;
 	private float pagesGap;
 	ViewGroup parent = null;
@@ -54,6 +61,7 @@ public class MainSurface extends RelativeLayout {
 	private int floatButtonSize;
 	private int width = 0;
 	private int height = 0;
+	private OnPageZoomListener pageZoomListener = null;
 
 	public MainSurface(Context context, AttributeSet attrs) {
 		super(context, attrs);
@@ -115,7 +123,7 @@ public class MainSurface extends RelativeLayout {
 			// Recalculate height
 			pageHeight = pageWidth * contentHeight / contentWidth;
 		}
-		float zoomFactor = contentWidth / pageWidth;
+		float zoomFactor = contentWidth / pageWidth * zoom;
 		// Log.i(TAG, "Calc page size pass 2: " + pageWidth + "x" + pageHeight +
 		// ", " + width + "x" + height + " " + zoomFactor + ", " + density);
 		// if (zoomFactor > 0.2 / density) { //
@@ -163,7 +171,11 @@ public class MainSurface extends RelativeLayout {
 
 			@Override
 			public void onClick(View arg0) {
-				page.requestFocus();
+				Log.i(TAG, "Click on page");
+				onShowZoom();
+				if (!page.isFocused()) { // Request focus
+					page.requestFocus();
+				}
 			}
 		});
 		// requestLayout();
@@ -312,8 +324,7 @@ public class MainSurface extends RelativeLayout {
 		params.topMargin = (int) (info.y / page.zoomFactor + page.marginTop);
 		textView.setBackgroundResource(adapter.getController().getBackgroundDrawable(info.color));
 		int textPadding = (int) (TEXT_PADDING / page.zoomFactor);
-		textView.setPadding(textPadding, textPadding, textPadding,
-				textPadding);
+		textView.setPadding(textPadding, textPadding, textPadding, textPadding);
 		textView.setTextSize(TypedValue.COMPLEX_UNIT_PX, TEXT_SIZE / page.zoomFactor);
 		textView.setFocusable(true);
 		textView.setFocusableInTouchMode(true);
@@ -332,7 +343,7 @@ public class MainSurface extends RelativeLayout {
 			public void onFocusChange(View v, boolean hasFocus) {
 				// Log.i(TAG, "Focus changed: " + info.id + ", " + hasFocus);
 				if (hasFocus) { // Bring to front first
-					textView.bringToFront();
+					// textView.bringToFront();
 					toolbarParams.addRule(RelativeLayout.ALIGN_TOP, textView.getId());
 					toolbarParams.addRule(RelativeLayout.RIGHT_OF, textView.getId());
 					toolbar.setVisibility(VISIBLE);
@@ -368,5 +379,15 @@ public class MainSurface extends RelativeLayout {
 		} else {
 			Log.i(TAG, "Saved ERR");
 		}
+	}
+
+	public void onShowZoom() {
+		if (null != pageZoomListener) {
+			pageZoomListener.onShow();
+		}
+	}
+
+	public void setPageZoomListener(OnPageZoomListener pageZoomListener) {
+		this.pageZoomListener = pageZoomListener;
 	}
 }
