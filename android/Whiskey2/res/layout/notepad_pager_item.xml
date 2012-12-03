@@ -1,32 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent" >
-
+    android:layout_height="match_parent">
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:fillViewport="true" >
-
-        <HorizontalScrollView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:fillViewport="true" >
-
-            <org.kvj.whiskey2.widgets.MainSurface
-                android:id="@+id/notepad_main_surface"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" >
-            </org.kvj.whiskey2.widgets.MainSurface>
-        </HorizontalScrollView>
+        android:fillViewport="true">
+        <org.kvj.whiskey2.widgets.MainSurface
+            android:id="@+id/notepad_main_surface"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content">
+        </org.kvj.whiskey2.widgets.MainSurface>
     </ScrollView>
-    
     <ZoomControls
-        android:id="@+id/notepad_main_zoom" 
+        android:id="@+id/notepad_main_zoom"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
-        android:layout_marginBottom="10dp"
-        android:layout_centerHorizontal="true"/>
-
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="10dp"/>
 </RelativeLayout>

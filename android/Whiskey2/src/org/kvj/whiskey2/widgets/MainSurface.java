@@ -343,7 +343,7 @@ public class MainSurface extends RelativeLayout {
 			public void onFocusChange(View v, boolean hasFocus) {
 				// Log.i(TAG, "Focus changed: " + info.id + ", " + hasFocus);
 				if (hasFocus) { // Bring to front first
-					// textView.bringToFront();
+					textView.bringToFront();
 					toolbarParams.addRule(RelativeLayout.ALIGN_TOP, textView.getId());
 					toolbarParams.addRule(RelativeLayout.RIGHT_OF, textView.getId());
 					toolbar.setVisibility(VISIBLE);

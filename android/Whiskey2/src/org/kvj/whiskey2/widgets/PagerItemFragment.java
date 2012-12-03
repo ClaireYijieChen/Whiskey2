@@ -6,6 +6,8 @@ import org.kvj.whiskey2.widgets.adapters.SheetsAdapter;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -19,10 +21,19 @@ import com.actionbarsherlock.app.SherlockFragment;
 public class PagerItemFragment extends SherlockFragment implements OnPageZoomListener {
 
 	private static final String TAG = "PagerFragment";
+	private static final long ZOOM_HIDE_MSEC = 3000;
 	private int index = -1;
 	MainSurface surface = null;
 	private SheetsAdapter adapter = null;
 	private long notepadID = -1;
+	Handler hideZoomHandler = new Handler(new Handler.Callback() {
+
+		@Override
+		public boolean handleMessage(Message msg) {
+			zoomButtons.hide();
+			return true;
+		}
+	});
 
 	private OnZoomListener zoomListener = new OnZoomListener() {
 
@@ -132,5 +143,7 @@ public class PagerItemFragment extends SherlockFragment implements OnPageZoomLis
 	@Override
 	public void onShow() {
 		zoomButtons.show();
+		hideZoomHandler.removeMessages(0);
+		hideZoomHandler.sendEmptyMessageDelayed(0, ZOOM_HIDE_MSEC);
 	}
 }
