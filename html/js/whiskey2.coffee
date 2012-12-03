@@ -404,10 +404,17 @@ class Notepad
         @app.manager.storage.update 'sheets', sheet, _handler
       return no
     templateButtonText = $('#sheet-dialog-template-title')
+    templateButtonText.text('No template')
     ul = $('#sheet-dialog-template-menu').empty()
     @app.manager.storage.select 'templates', [], (err, data) =>
       if err then return
       ul.empty()
+      li = $(document.createElement('li')).appendTo(ul)
+      a = $(document.createElement('a')).appendTo(li)
+      a.text 'No template'
+      a.bind 'click', (e) =>
+        templateID = null
+        templateButtonText.text('No template')
       for item in data
         li = $(document.createElement('li')).appendTo(ul)
         a = $(document.createElement('a')).appendTo(li)
@@ -870,7 +877,7 @@ class Notepad
     return div
 
 class TemplateManager
-  
+
   constructor: (@app) ->
     $('.templates-add').bind 'click', () =>
       @edit()
@@ -891,12 +898,12 @@ class TemplateManager
     @editType = $('#template-type')
     @editConfig = $('#template-config')
     @disableForm()
-    
+
   disableForm: ->
     form = $('.template-form')
     form.find('input, button, textarea').attr disabled: 'disabled'
     form.find('input, textarea').val ''
-  
+
   enableForm: ->
     form = $('.template-form')
     form.find('input, textarea').attr disabled: null
@@ -963,7 +970,7 @@ class TemplateManager
     @editHeight.val(template.height ? 0)
     @editType.val(template.type ? '')
     @editConfig.val(if template.config then JSON.stringify(template.config) else '{}')
-  
+
   refresh: (selectID) ->
     ul = $('.templates-list-ul')
     @app.manager.storage.select 'templates', [], (err, data) =>
