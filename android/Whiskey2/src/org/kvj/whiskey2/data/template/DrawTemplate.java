@@ -20,13 +20,18 @@ public class DrawTemplate {
 	protected Paint linePaint = new Paint();
 	protected Paint textPaint = new Paint();
 	protected float density = 1;
+	private static final float FONT_SIZE_SMALLEST = (float) 3.5;
+	private static final float FONT_SIZE_SMALL = (float) 4.5;
+	private static final float FONT_SIZE_NORMAL = (float) 5.5;
+	private static final float FONT_SIZE_LARGE = (float) 6.5;
+	private static final float FONT_SIZE_LARGEST = (float) 7.5;
 	private static final float FONT_WIDTH = (float) 0.5;
 
 	public DrawTemplate(DataController controller) {
 		this.controller = controller;
 		density = Whiskey2App.getInstance().getResources().getDisplayMetrics().density;
 		linePaint.setStyle(Style.STROKE);
-		textPaint.setStyle(Style.FILL_AND_STROKE);
+		textPaint.setStyle(Style.FILL);
 		textPaint.setStrokeWidth(density * FONT_WIDTH);
 	}
 
@@ -44,6 +49,23 @@ public class DrawTemplate {
 
 	private void setTextParameters(JSONObject obj, Paint paint, Canvas canvas, float zoom) {
 		paint.setColor(Color.parseColor(obj.optString("color", "#000000")));
+		int fontSize = obj.optInt("size", 0);
+		float fontPixel = FONT_SIZE_NORMAL;
+		switch (fontSize) {
+		case -2:
+			fontPixel = FONT_SIZE_SMALLEST;
+			break;
+		case -1:
+			fontPixel = FONT_SIZE_SMALL;
+			break;
+		case 1:
+			fontPixel = FONT_SIZE_LARGE;
+			break;
+		case 2:
+			fontPixel = FONT_SIZE_LARGEST;
+			break;
+		}
+		paint.setTextSize(fontPixel / zoom);
 	}
 
 	public void draw(JSONArray data, Canvas canvas, float zoom) throws JSONException {
@@ -51,6 +73,9 @@ public class DrawTemplate {
 			JSONObject obj = data.getJSONObject(i);
 			String type = obj.optString("type", "");
 			if ("text".equals(type)) { // Draw text
+				setTextParameters(obj, textPaint, canvas, zoom);
+				canvas.drawText(obj.optString("text", ""), (float) obj.optDouble("x", 0) / zoom,
+						(float) obj.optDouble("y", 0) / zoom, textPaint);
 			}
 			if ("line".equals(type)) { // Draw line
 				setLineParameters(obj, linePaint, canvas);

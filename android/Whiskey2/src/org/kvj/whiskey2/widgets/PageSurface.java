@@ -104,7 +104,7 @@ public class PageSurface extends View {
 		paint.setStrokeWidth(density * FONT_WIDTH);
 		canvas.drawText(title, TITLE_LEFT / zoomFactor, TITLE_TOP / zoomFactor, paint);
 		if (null != templateConfig) { // Have template config - draw
-			canvas.translate(density * 2, density * 2);
+		// canvas.translate(density * 2, density * 2);
 			try {
 				templateConfig.render(templateInfo, sheetInfo, canvas, this);
 			} catch (JSONException e) {
