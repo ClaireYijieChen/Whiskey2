@@ -8,6 +8,7 @@ import org.kvj.whiskey2.data.BookmarkInfo;
 import org.kvj.whiskey2.data.NoteInfo;
 import org.kvj.whiskey2.data.SheetInfo;
 import org.kvj.whiskey2.data.TemplateInfo;
+import org.kvj.whiskey2.data.template.DrawTemplate;
 import org.kvj.whiskey2.widgets.adapters.SheetsAdapter;
 import org.kvj.whiskey2.widgets.v11.BookmarkDnDDecorator;
 import org.kvj.whiskey2.widgets.v11.NoteDnDDecorator;
@@ -258,6 +259,12 @@ public class MainSurface extends RelativeLayout {
 		}
 		final PageSurface page = new PageSurface(getContext());
 		final TemplateInfo template = adapter.getController().getTemplate(sheet.templateID);
+		DrawTemplate templateConfig = adapter.getController().getTemplateConfig(template);
+		if (null != templateConfig) { // Have - instruct PageSurface
+			page.setTemplateConfig(templateConfig);
+			page.setTemplateInfo(template);
+			page.setSheetInfo(sheet);
+		}
 		AsyncTask<Void, Void, List<NoteInfo>> task = new AsyncTask<Void, Void, List<NoteInfo>>() {
 
 			@Override

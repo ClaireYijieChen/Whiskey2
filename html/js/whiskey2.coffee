@@ -1,5 +1,5 @@
 yepnope({
-  load: ['lib/jquery-1.8.2.min.js', 'bs/css/bootstrap.min.css', 'bs/js/bootstrap.min.js', 'lib/custom-web/date.js', 'lib/custom-web/cross-utils.js', 'lib/common-web/underscore-min.js', 'lib/common-web/underscore.strings.js', 'css/whiskey2.css', 'lib/lima1/net.js', 'lib/lima1/main.js', 'bs/js/bootstrap-colorpicker.js', 'bs/js/bootstrap-datepicker.js', 'bs/css/datepicker.css', 'bs/css/colorpicker.css'],
+  load: ['lib/jquery-1.8.2.min.js', 'bs/css/bootstrap.min.css', 'bs/js/bootstrap.min.js', 'lib/custom-web/date.js', 'lib/custom-web/cross-utils.js', 'lib/common-web/underscore-min.js', 'lib/common-web/underscore.strings.js', 'css/whiskey2.css', 'lib/lima1/net.js', 'lib/lima1/main.js', 'bs/js/bootstrap-datepicker.js', 'bs/css/datepicker.css', 'lib/common-web/canto-0.15.js'],
   complete: ->
     $(document).ready(->
       app = new Whiskey2
@@ -26,6 +26,8 @@ class Whiskey2
     @manager.on_scheduled_sync = () =>
       @sync()
     @oauth.token = @manager.get('token', 'no-value')
+    @templateConfigs = {}
+    @templateConfigs.draw = new DrawTemplate this
     @manager.open (error) =>
       if error
         @manager = null
@@ -229,6 +231,10 @@ class Whiskey2
     if tmpl then return tmpl
     return @emptyTemplate
 
+  getTemplateConfig: (tmpl) ->
+    return @templateConfigs[tmpl?.type] ? null
+
+
   findByID: (arr, id, attr = 'id') ->
     if not id then return -1
     for i in [0...arr.length]
@@ -351,6 +357,7 @@ class Notepad
     if direction<0 and @zoom<=@zoomStep then return
     @zoom += direction*@zoomStep
     @divContent.css 'font-size': "#{@zoom}em"
+    @reloadSheets()
 
   showBMarkDialog: (bmark, handler) ->
     $('#bmark-dialog').modal('show')
@@ -581,6 +588,7 @@ class Notepad
     for i in [0...@maxSheetsVisible]
       div = $(document.createElement('div')).addClass('sheet').appendTo @divContent
       divContent = $(document.createElement('div')).addClass('sheet_content').appendTo div
+      canvas = $(document.createElement('canvas')).addClass('sheet-canvas').appendTo divContent
       divTitle = $(document.createElement('div')).addClass('sheet_title').appendTo div
       divToolbar = $('#sheet-toolbar-template').clone().removeClass('hide').appendTo div
       @sheetDivs.push div
@@ -721,7 +729,7 @@ class Notepad
         bmarkx += bmarkstep
     @app.manager.storage.select 'notes', ['sheet_id', sheet.id], (err, arr) =>
       if err then return @app.showError err
-      parent.empty()
+      parent.children('div').remove()
       for item in arr
         loadNote item
         @notes.push item
@@ -767,7 +775,9 @@ class Notepad
     sheet = @sheets[index]
     if not sheet then return null
     template = @app.getTemplate sheet.template_id
+    templateConfig = @app.getTemplateConfig template
     divContent = div.find('.sheet_content')
+    canvas = canto(div.find('.sheet-canvas').get(0))
     width = Math.floor(template.width/@zoomFactor)
     height = Math.floor(template.height/@zoomFactor)
     divContent.css width: "#{width}em", height: "#{height}em"
@@ -873,6 +883,11 @@ class Notepad
               if err then return @app.showError err
               @reloadSheets()
       return false
+    # log 'Before render:', divContent.width(), divContent.height()
+    canvas.width = divContent.width()
+    canvas.height = divContent.height()
+    if templateConfig
+      templateConfig.render template, sheet, canvas, divContent.width()/template.width
     @loadNotes sheet, divContent
     return div
 
@@ -969,7 +984,7 @@ class TemplateManager
     @editWidth.val(template.width ? 0)
     @editHeight.val(template.height ? 0)
     @editType.val(template.type ? '')
-    @editConfig.val(if template.config then JSON.stringify(template.config) else '{}')
+    @editConfig.val(if template.config then JSON.stringify(template.config, null, 2) else '{}')
 
   refresh: (selectID) ->
     ul = $('.templates-list-ul')
@@ -993,3 +1008,212 @@ class TemplateManager
             return no
       if not found then @disableForm()
     , order: ['tag', 'name']
+class DrawTemplate
+  constructor: (@app) ->
+
+  render: (tmpl, sheet, canvas, zoom) ->
+    data = tmpl.config?.draw ? []
+    @draw data, canvas, zoom
+
+  draw: (data, canvas, zoom) ->
+    lineParams = (obj, params) ->
+      params.lineWidth = obj?.width ? 1
+      params.strokeStyle = obj?.color ? '#000000'
+    textParams = (obj, params) ->
+      params.strokeStyle = obj?.color ? '#000000'
+      params.fillStyle = obj?.color ? '#000000'
+      params.lineWidth = obj?.width ? 1
+      fontSize = obj?.size ? 0
+      fontPixels = 0
+      switch fontSize
+        when -2 then fontPixels = zoom*3.5
+        when -1 then fontPixels = zoom*4.5
+        when 0 then fontPixels = zoom*5.5
+        when 1 then fontPixels = zoom*6.5
+        when 2 then fontPixels = zoom*7.5
+      params.font = ''+(Math.round(fontPixels*100)/100)+'px Arial'
+    canvas.reset()
+    for item in data
+      canvas.save()
+      params = {}
+      switch item.type
+        when 'line'
+          lineParams item, params
+          canvas.beginPath().moveTo(item.x1*zoom, item.y1*zoom).lineTo(item.x2*zoom, item.y2*zoom).paint(params).endPath()
+        when 'text'
+          textParams item, params
+          canvas.fillText(item.text, item.x*zoom, item.y*zoom, params)
+      canvas.restore()
+###
+{
+  "draw": [
+    {
+      "type": "line",
+      "color": "#dddddd",
+      "x1": 65,
+      "y1": 11,
+      "x2": 95,
+      "y2": 11
+    },
+    {
+      "type": "text",
+      "x": 90,
+      "y": 9,
+      "text": "åé"
+    },
+    {
+      "type": "line",
+      "color": "#dddddd",
+      "x1": 65,
+      "y1": 29,
+      "x2": 95,
+      "y2": 29
+    },
+    {
+      "type": "text",
+      "x": 90,
+      "y": 27,
+      "text": "âŒ"
+    },
+    {
+      "type": "line",
+      "color": "#dddddd",
+      "x1": 65,
+      "y1": 47,
+      "x2": 95,
+      "y2": 47
+    },
+    {
+      "type": "text",
+      "x": 90,
+      "y": 45,
+      "text": "êÖ"
+    },
+    {
+      "type": "line",
+      "color": "#dddddd",
+      "x1": 65,
+      "y1": 65,
+      "x2": 95,
+      "y2": 65
+    },
+    {
+      "type": "text",
+      "x": 90,
+      "y": 63,
+      "text": "ñÿ"
+    },
+    {
+      "type": "line",
+      "color": "#dddddd",
+      "x1": 65,
+      "y1": 83,
+      "x2": 95,
+      "y2": 83
+    },
+    {
+      "type": "text",
+      "x": 90,
+      "y": 81,
+      "text": "ã‡"
+    },
+    {
+      "type": "line",
+      "color": "#dddddd",
+      "x1": 65,
+      "y1": 101,
+      "x2": 95,
+      "y2": 101
+    },
+    {
+      "type": "text",
+      "x": 90,
+      "y": 99,
+      "color": "#ff8888",
+      "text": "ìy"
+    },
+    {
+      "type": "line",
+      "color": "#dddddd",
+      "x1": 65,
+      "y1": 119,
+      "x2": 95,
+      "y2": 119
+    },
+    {
+      "type": "text",
+      "color": "#ff8888",
+      "x": 90,
+      "y": 117,
+      "text": "ì˙"
+    }
+  ]
+}
+###
+
+###
+{
+  "draw": [
+    {
+      "type": "line",
+      "color": "#dddddd",
+      "x1": 5,
+      "y1": 20,
+      "x2": 50,
+      "y2": 20
+    },
+    {
+      "type": "line",
+      "color": "#ff0000",
+      "x1": 5,
+      "width": 2,
+      "y1": 30,
+      "x2": 50,
+      "y2": 30
+    },
+    {
+      "type": "line",
+      "color": "#0000ff",
+      "x1": 5,
+      "width": 3,
+      "y1": 40,
+      "x2": 50,
+      "y2": 40
+    },
+    {
+      "type": "text",
+      "x": 5,
+      "y": 70,
+      "text": "Lorem ipsum"
+    },
+    {
+      "type": "text",
+      "x": 5,
+      "size": -1,
+      "y": 60,
+      "text": "Lorem ipsum"
+    },
+    {
+      "type": "text",
+      "x": 5,
+      "size": -2,
+      "y": 50,
+      "text": "Lorem ipsum"
+    },
+    {
+      "type": "text",
+      "x": 5,
+      "size": 1,
+      "y": 80,
+      "text": "Lorem ipsum"
+    },
+    {
+      "type": "text",
+      "x": 5,
+      "size": 2,
+      "y": 90,
+      "text": "Lorem ipsum"
+    }
+  ]
+}
+###

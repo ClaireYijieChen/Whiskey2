@@ -262,3 +262,10 @@
 #template-config {
     font-family: monospace;
 }
+
+.sheet-canvas {
+    position: absolute;
+    left: 0;
+    top: 0;
+    display: block;
+}

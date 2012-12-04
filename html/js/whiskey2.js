@@ -1,9 +1,9 @@
 (function() {
-  var Notepad, TemplateManager, Whiskey2,
+  var DrawTemplate, Notepad, TemplateManager, Whiskey2,
     __slice = Array.prototype.slice;
 
   yepnope({
-    load: ['lib/jquery-1.8.2.min.js', 'bs/css/bootstrap.min.css', 'bs/js/bootstrap.min.js', 'lib/custom-web/date.js', 'lib/custom-web/cross-utils.js', 'lib/common-web/underscore-min.js', 'lib/common-web/underscore.strings.js', 'css/whiskey2.css', 'lib/lima1/net.js', 'lib/lima1/main.js', 'bs/js/bootstrap-colorpicker.js', 'bs/js/bootstrap-datepicker.js', 'bs/css/datepicker.css', 'bs/css/colorpicker.css'],
+    load: ['lib/jquery-1.8.2.min.js', 'bs/css/bootstrap.min.css', 'bs/js/bootstrap.min.js', 'lib/custom-web/date.js', 'lib/custom-web/cross-utils.js', 'lib/common-web/underscore-min.js', 'lib/common-web/underscore.strings.js', 'css/whiskey2.css', 'lib/lima1/net.js', 'lib/lima1/main.js', 'bs/js/bootstrap-datepicker.js', 'bs/css/datepicker.css', 'lib/common-web/canto-0.15.js'],
     complete: function() {
       return $(document).ready(function() {
         var app;
@@ -42,6 +42,8 @@
         return _this.sync();
       };
       this.oauth.token = this.manager.get('token', 'no-value');
+      this.templateConfigs = {};
+      this.templateConfigs.draw = new DrawTemplate(this);
       return this.manager.open(function(error) {
         if (error) {
           _this.manager = null;
@@ -375,6 +377,11 @@
       return this.emptyTemplate;
     };
 
+    Whiskey2.prototype.getTemplateConfig = function(tmpl) {
+      var _ref;
+      return (_ref = this.templateConfigs[tmpl != null ? tmpl.type : void 0]) != null ? _ref : null;
+    };
+
     Whiskey2.prototype.findByID = function(arr, id, attr) {
       var i, _ref;
       if (attr == null) attr = 'id';
@@ -544,9 +551,10 @@
       if (direction == null) direction = 1;
       if (direction < 0 && this.zoom <= this.zoomStep) return;
       this.zoom += direction * this.zoomStep;
-      return this.divContent.css({
+      this.divContent.css({
         'font-size': "" + this.zoom + "em"
       });
+      return this.reloadSheets();
     };
 
     Notepad.prototype.showBMarkDialog = function(bmark, handler) {
@@ -897,12 +905,13 @@
     Notepad.prototype.maxSheetsVisible = 2;
 
     Notepad.prototype.initSheetPlaceholders = function() {
-      var div, divContent, divTitle, divToolbar, i, _ref, _results;
+      var canvas, div, divContent, divTitle, divToolbar, i, _ref, _results;
       this.sheetDivs = [];
       _results = [];
       for (i = 0, _ref = this.maxSheetsVisible; 0 <= _ref ? i < _ref : i > _ref; 0 <= _ref ? i++ : i--) {
         div = $(document.createElement('div')).addClass('sheet').appendTo(this.divContent);
         divContent = $(document.createElement('div')).addClass('sheet_content').appendTo(div);
+        canvas = $(document.createElement('canvas')).addClass('sheet-canvas').appendTo(divContent);
         divTitle = $(document.createElement('div')).addClass('sheet_title').appendTo(div);
         divToolbar = $('#sheet-toolbar-template').clone().removeClass('hide').appendTo(div);
         _results.push(this.sheetDivs.push(div));
@@ -1118,7 +1127,7 @@
       return this.app.manager.storage.select('notes', ['sheet_id', sheet.id], function(err, arr) {
         var item, _i, _len;
         if (err) return _this.app.showError(err);
-        parent.empty();
+        parent.children('div').remove();
         for (_i = 0, _len = arr.length; _i < _len; _i++) {
           item = arr[_i];
           loadNote(item);
@@ -1141,7 +1150,7 @@
     Notepad.prototype.stick = true;
 
     Notepad.prototype.loadSheet = function(index, div) {
-      var clearSelector, divContent, divTitle, height, inRectangle, notesInRectangle, offsetToCoordinates, sheet, stickToGrid, template, width, _ref,
+      var canvas, clearSelector, divContent, divTitle, height, inRectangle, notesInRectangle, offsetToCoordinates, sheet, stickToGrid, template, templateConfig, width, _ref,
         _this = this;
       clearSelector = function() {
         if (_this.selectorDiv) {
@@ -1197,7 +1206,9 @@
       sheet = this.sheets[index];
       if (!sheet) return null;
       template = this.app.getTemplate(sheet.template_id);
+      templateConfig = this.app.getTemplateConfig(template);
       divContent = div.find('.sheet_content');
+      canvas = canto(div.find('.sheet-canvas').get(0));
       width = Math.floor(template.width / this.zoomFactor);
       height = Math.floor(template.height / this.zoomFactor);
       divContent.css({
@@ -1359,6 +1370,11 @@
         }
         return false;
       });
+      canvas.width = divContent.width();
+      canvas.height = divContent.height();
+      if (templateConfig) {
+        templateConfig.render(template, sheet, canvas, divContent.width() / template.width);
+      }
       this.loadNotes(sheet, divContent);
       return div;
     };
@@ -1516,7 +1532,7 @@
       this.editWidth.val((_ref3 = template.width) != null ? _ref3 : 0);
       this.editHeight.val((_ref4 = template.height) != null ? _ref4 : 0);
       this.editType.val((_ref5 = template.type) != null ? _ref5 : '');
-      return this.editConfig.val(template.config ? JSON.stringify(template.config) : '{}');
+      return this.editConfig.val(template.config ? JSON.stringify(template.config, null, 2) : '{}');
     };
 
     TemplateManager.prototype.refresh = function(selectID) {
@@ -1559,5 +1575,247 @@
     return TemplateManager;
 
   })();
+
+  DrawTemplate = (function() {
+
+    function DrawTemplate(app) {
+      this.app = app;
+    }
+
+    DrawTemplate.prototype.render = function(tmpl, sheet, canvas, zoom) {
+      var data, _ref, _ref2;
+      data = (_ref = (_ref2 = tmpl.config) != null ? _ref2.draw : void 0) != null ? _ref : [];
+      return this.draw(data, canvas, zoom);
+    };
+
+    DrawTemplate.prototype.draw = function(data, canvas, zoom) {
+      var item, lineParams, params, textParams, _i, _len, _results;
+      lineParams = function(obj, params) {
+        var _ref, _ref2;
+        params.lineWidth = (_ref = obj != null ? obj.width : void 0) != null ? _ref : 1;
+        return params.strokeStyle = (_ref2 = obj != null ? obj.color : void 0) != null ? _ref2 : '#000000';
+      };
+      textParams = function(obj, params) {
+        var fontPixels, fontSize, _ref, _ref2, _ref3, _ref4;
+        params.strokeStyle = (_ref = obj != null ? obj.color : void 0) != null ? _ref : '#000000';
+        params.fillStyle = (_ref2 = obj != null ? obj.color : void 0) != null ? _ref2 : '#000000';
+        params.lineWidth = (_ref3 = obj != null ? obj.width : void 0) != null ? _ref3 : 1;
+        fontSize = (_ref4 = obj != null ? obj.size : void 0) != null ? _ref4 : 0;
+        fontPixels = 0;
+        switch (fontSize) {
+          case -2:
+            fontPixels = zoom * 3.5;
+            break;
+          case -1:
+            fontPixels = zoom * 4.5;
+            break;
+          case 0:
+            fontPixels = zoom * 5.5;
+            break;
+          case 1:
+            fontPixels = zoom * 6.5;
+            break;
+          case 2:
+            fontPixels = zoom * 7.5;
+        }
+        return params.font = '' + (Math.round(fontPixels * 100) / 100) + 'px Arial';
+      };
+      canvas.reset();
+      _results = [];
+      for (_i = 0, _len = data.length; _i < _len; _i++) {
+        item = data[_i];
+        canvas.save();
+        params = {};
+        switch (item.type) {
+          case 'line':
+            lineParams(item, params);
+            canvas.beginPath().moveTo(item.x1 * zoom, item.y1 * zoom).lineTo(item.x2 * zoom, item.y2 * zoom).paint(params).endPath();
+            break;
+          case 'text':
+            textParams(item, params);
+            canvas.fillText(item.text, item.x * zoom, item.y * zoom, params);
+        }
+        _results.push(canvas.restore());
+      }
+      return _results;
+    };
+
+    return DrawTemplate;
+
+  })();
+
+  /*
+  {
+    "draw": [
+      {
+        "type": "line",
+        "color": "#dddddd",
+        "x1": 65,
+        "y1": 11,
+        "x2": 95,
+        "y2": 11
+      },
+      {
+        "type": "text",
+        "x": 90,
+        "y": 9,
+        "text": "��"
+      },
+      {
+        "type": "line",
+        "color": "#dddddd",
+        "x1": 65,
+        "y1": 29,
+        "x2": 95,
+        "y2": 29
+      },
+      {
+        "type": "text",
+        "x": 90,
+        "y": 27,
+        "text": "��"
+      },
+      {
+        "type": "line",
+        "color": "#dddddd",
+        "x1": 65,
+        "y1": 47,
+        "x2": 95,
+        "y2": 47
+      },
+      {
+        "type": "text",
+        "x": 90,
+        "y": 45,
+        "text": "��"
+      },
+      {
+        "type": "line",
+        "color": "#dddddd",
+        "x1": 65,
+        "y1": 65,
+        "x2": 95,
+        "y2": 65
+      },
+      {
+        "type": "text",
+        "x": 90,
+        "y": 63,
+        "text": "��"
+      },
+      {
+        "type": "line",
+        "color": "#dddddd",
+        "x1": 65,
+        "y1": 83,
+        "x2": 95,
+        "y2": 83
+      },
+      {
+        "type": "text",
+        "x": 90,
+        "y": 81,
+        "text": "��"
+      },
+      {
+        "type": "line",
+        "color": "#dddddd",
+        "x1": 65,
+        "y1": 101,
+        "x2": 95,
+        "y2": 101
+      },
+      {
+        "type": "text",
+        "x": 90,
+        "y": 99,
+        "color": "#ff8888",
+        "text": "�y"
+      },
+      {
+        "type": "line",
+        "color": "#dddddd",
+        "x1": 65,
+        "y1": 119,
+        "x2": 95,
+        "y2": 119
+      },
+      {
+        "type": "text",
+        "color": "#ff8888",
+        "x": 90,
+        "y": 117,
+        "text": "��"
+      }
+    ]
+  }
+  */
+
+  /*
+  {
+    "draw": [
+      {
+        "type": "line",
+        "color": "#dddddd",
+        "x1": 5,
+        "y1": 20,
+        "x2": 50,
+        "y2": 20
+      },
+      {
+        "type": "line",
+        "color": "#ff0000",
+        "x1": 5,
+        "width": 2,
+        "y1": 30,
+        "x2": 50,
+        "y2": 30
+      },
+      {
+        "type": "line",
+        "color": "#0000ff",
+        "x1": 5,
+        "width": 3,
+        "y1": 40,
+        "x2": 50,
+        "y2": 40
+      },
+      {
+        "type": "text",
+        "x": 5,
+        "y": 70,
+        "text": "Lorem ipsum"
+      },
+      {
+        "type": "text",
+        "x": 5,
+        "size": -1,
+        "y": 60,
+        "text": "Lorem ipsum"
+      },
+      {
+        "type": "text",
+        "x": 5,
+        "size": -2,
+        "y": 50,
+        "text": "Lorem ipsum"
+      },
+      {
+        "type": "text",
+        "x": 5,
+        "size": 1,
+        "y": 80,
+        "text": "Lorem ipsum"
+      },
+      {
+        "type": "text",
+        "x": 5,
+        "size": 2,
+        "y": 90,
+        "text": "Lorem ipsum"
+      }
+    ]
+  }
+  */
 
 }).call(this);

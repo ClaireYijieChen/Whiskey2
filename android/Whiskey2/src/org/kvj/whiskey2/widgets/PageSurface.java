@@ -3,8 +3,12 @@ package org.kvj.whiskey2.widgets;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.json.JSONException;
 import org.kvj.whiskey2.R;
 import org.kvj.whiskey2.data.NoteInfo;
+import org.kvj.whiskey2.data.SheetInfo;
+import org.kvj.whiskey2.data.TemplateInfo;
+import org.kvj.whiskey2.data.template.DrawTemplate;
 
 import android.content.Context;
 import android.graphics.Canvas;
@@ -34,6 +38,9 @@ public class PageSurface extends View {
 	List<NoteInfo> notes = new ArrayList<NoteInfo>();
 	private float lastDownX = 0;
 	private float lastDownY = 0;
+	private SheetInfo sheetInfo = null;
+	private TemplateInfo templateInfo = null;
+	private DrawTemplate templateConfig = null;
 
 	public PageSurface(Context context) {
 		super(context);
@@ -92,11 +99,18 @@ public class PageSurface extends View {
 		float boxHeight = height - 2 * density;
 		canvas.drawRect(density * 2, density * 2, boxWidth, boxHeight, paint);
 		paint.setColor(Color.BLACK);
-		paint.setStyle(Style.STROKE);
 		paint.setStyle(Style.FILL_AND_STROKE);
 		paint.setTextSize(TITLE_FONT_SIZE / zoomFactor);
 		paint.setStrokeWidth(density * FONT_WIDTH);
 		canvas.drawText(title, TITLE_LEFT / zoomFactor, TITLE_TOP / zoomFactor, paint);
+		if (null != templateConfig) { // Have template config - draw
+			canvas.translate(density * 2, density * 2);
+			try {
+				templateConfig.render(templateInfo, sheetInfo, canvas, this);
+			} catch (JSONException e) {
+				e.printStackTrace();
+			}
+		}
 	}
 
 	public float getLastDownX() {
@@ -105,5 +119,21 @@ public class PageSurface extends View {
 
 	public float getLastDownY() {
 		return lastDownY;
+	}
+
+	public float getZoomFactor() {
+		return zoomFactor;
+	}
+
+	public void setSheetInfo(SheetInfo sheetInfo) {
+		this.sheetInfo = sheetInfo;
+	}
+
+	public void setTemplateInfo(TemplateInfo templateInfo) {
+		this.templateInfo = templateInfo;
+	}
+
+	public void setTemplateConfig(DrawTemplate templateConfig) {
+		this.templateConfig = templateConfig;
 	}
 }

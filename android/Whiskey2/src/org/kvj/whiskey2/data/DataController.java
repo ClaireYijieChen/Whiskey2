@@ -14,6 +14,7 @@ import org.kvj.lima1.sync.SyncService;
 import org.kvj.lima1.sync.SyncServiceInfo;
 import org.kvj.whiskey2.R;
 import org.kvj.whiskey2.Whiskey2App;
+import org.kvj.whiskey2.data.template.DrawTemplate;
 
 import android.content.Intent;
 import android.os.IBinder;
@@ -42,9 +43,11 @@ public class DataController {
 	List<DataControllerListener> listeners = new ArrayList<DataController.DataControllerListener>();
 	Map<Long, List<BookmarkInfo>> bookmarks = new HashMap<Long, List<BookmarkInfo>>();
 	Map<Long, TemplateInfo> templates = new HashMap<Long, TemplateInfo>();
+	Map<String, DrawTemplate> templateConfigs = new HashMap<String, DrawTemplate>();
 
 	public DataController(Whiskey2App whiskey2App) {
 		this.app = whiskey2App;
+		templateConfigs.put("draw", new DrawTemplate(this));
 		startConnector();
 	}
 
@@ -422,5 +425,10 @@ public class DataController {
 			Log.e(TAG, "Error saving note:", e);
 		}
 		return false;
+	}
+
+	public DrawTemplate getTemplateConfig(TemplateInfo info) {
+		DrawTemplate tmplConfig = templateConfigs.get(info.type);
+		return tmplConfig;
 	}
 }
