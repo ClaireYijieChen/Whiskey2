@@ -1,5 +1,6 @@
 package org.kvj.whiskey2.data;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.kvj.lima1.sync.PJSONObject;
 
@@ -13,6 +14,7 @@ public class NoteInfo {
 	public int x;
 	public int y;
 	public int color;
+	public JSONArray links = null;
 	public TextView widget = null;
 	public boolean collapsed = true;
 	public long sheetID = -1;
@@ -29,6 +31,7 @@ public class NoteInfo {
 		info.collapsible = obj.optBoolean("collapsed", false);
 		info.sheetID = obj.getLong("sheet_id");
 		info.original = obj;
+		info.links = obj.optJSONArray("links");
 		return info;
 	}
 
@@ -43,6 +46,9 @@ public class NoteInfo {
 		original.put("y", y);
 		original.put("width", width);
 		original.put("sheet_id", sheetID);
+		if (null != links) { // Add links
+			original.put("links", links);
+		}
 		return original;
 	}
 }

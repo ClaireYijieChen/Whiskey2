@@ -1021,9 +1021,151 @@
       return Math.floor(value * 100 / this.zoomFactor) / 100;
     };
 
-    Notepad.prototype.loadNotes = function(sheet, parent) {
-      var loadNote, renderBookmarks,
+    Notepad.prototype.createNoteLink = function(note, noteID) {
+      var index, links, otherNote,
         _this = this;
+      if (note.id === noteID) {
+        log('Same note');
+        return false;
+      }
+      index = this.app.findByID(this.notes, noteID);
+      if (-1 === index) {
+        log('From other page');
+        return false;
+      }
+      otherNote = this.notes[index];
+      if (note.sheet_id !== otherNote.sheet_id) {
+        log('From other sheet');
+        return false;
+      }
+      links = otherNote.links;
+      if (!links) {
+        otherNote.links = [];
+        links = otherNote.links;
+      }
+      index = this.app.findByID(links, note.id);
+      if (index !== -1) {
+        log('Already created');
+        return false;
+      }
+      links.push({
+        id: note.id
+      });
+      this.app.manager.save('notes', otherNote, function(err) {
+        if (err) return _this.app.showError(err);
+        return _this.reloadSheets();
+      });
+      return true;
+    };
+
+    Notepad.prototype.loadNotes = function(sheet, parent, canvas, zoom) {
+      var loadNote, renderArrow, renderBookmarks, renderLinks,
+        _this = this;
+      renderArrow = function(div1, div2, color) {
+        var a, b, box1, box2, gap, lineWidth, width, x0, x1, x2, y0, y1, y2, _y0;
+        lineWidth = 1.5;
+        width = lineWidth * zoom;
+        gap = width;
+        box1 = {
+          x: div1.position().left - gap,
+          y: div1.position().top - gap,
+          w: div1.outerWidth() + 2 * gap,
+          h: div1.outerHeight() + 2 * gap
+        };
+        box2 = {
+          x: div2.position().left - gap,
+          y: div2.position().top - gap,
+          w: div2.outerWidth() + 2 * gap,
+          h: div2.outerHeight() + 2 * gap
+        };
+        x1 = box1.x + box1.w / 2;
+        x2 = box2.x + box2.w / 2;
+        y1 = box1.y + box1.h / 2;
+        y2 = box2.y + box2.h / 2;
+        x0 = x1 < x2 ? box2.x : box2.x + box2.w;
+        y0 = y1 < y2 ? box2.y : box2.y + box2.h;
+        if (x1 === x2) {
+          x0 = x1;
+        } else if (y1 === y2) {
+          y0 = y1;
+        } else {
+          a = (y2 - y1) / (x2 - x1);
+          b = y1 - x1 * a;
+          _y0 = x0 * a + b;
+          if ((box2.y < _y0 && _y0 < (box2.y + box2.h))) {
+            y0 = _y0;
+          } else {
+            x0 = (y0 - b) / a;
+          }
+        }
+        return canvas.beginPath().moveTo(x1, y1).lineTo(x0, y0).stroke({
+          lineWidth: width,
+          strokeStyle: color,
+          lineCap: 'round'
+        }).endPath();
+      };
+      renderLinks = function(notes) {
+        var createLink, dotDiv, dotsDiv, dotsRadius, i, index, link, links, note, other, radius, x, y, _i, _len, _ref, _results;
+        dotsRadius = 2;
+        _results = [];
+        for (_i = 0, _len = notes.length; _i < _len; _i++) {
+          note = notes[_i];
+          links = (_ref = note.links) != null ? _ref : [];
+          if (links.length === 0) continue;
+          dotsDiv = $(document.createElement('div')).addClass('note-dots').appendTo(parent);
+          x = _this.preciseEm(note.x - 2 * dotsRadius);
+          y = _this.preciseEm(note.y);
+          radius = _this.preciseEm(dotsRadius);
+          dotsDiv.css({
+            left: "" + x + "em",
+            top: "" + y + "em"
+          });
+          _results.push((function() {
+            var _ref2, _results2,
+              _this = this;
+            _results2 = [];
+            for (i = 0, _ref2 = links.length; 0 <= _ref2 ? i < _ref2 : i > _ref2; 0 <= _ref2 ? i++ : i--) {
+              link = links[i];
+              index = this.app.findByID(notes, link.id);
+              createLink = true;
+              other = null;
+              if (index === -1) {
+                createLink = false;
+              } else {
+                other = this.notes[index];
+                if (other.sheet_id !== note.sheet_id) createLink = false;
+              }
+              if (createLink) {
+                renderArrow($('#note' + note.id), $('#note' + other.id), '#ffaaaa', 6);
+              }
+              dotDiv = $(document.createElement('div')).addClass('note-dot').appendTo(dotsDiv);
+              dotDiv.css({
+                'border-width': "" + radius + "em",
+                'border-radius': "" + radius + "em"
+              });
+              dotDiv.css({
+                'border-color': (createLink ? '#008800' : '#ff0000')
+              });
+              _results2.push((function(i, link, note) {
+                return dotDiv.bind('dblclick', function(e) {
+                  _this.app.showPrompt('Are you sure want to remove link?', function() {
+                    note.links.splice(i, 1);
+                    return _this.app.manager.save('notes', note, function(err) {
+                      if (err) return _this.app.showError(err);
+                      return _this.reloadSheets();
+                    });
+                  });
+                  e.stopPropagation();
+                  e.preventDefault();
+                  return false;
+                });
+              })(i, link, note));
+            }
+            return _results2;
+          }).call(_this));
+        }
+        return _results;
+      };
       loadNote = function(note) {
         var div, i, line, lines, width, x, y, _ref, _ref2, _ref3, _ref4, _ref5, _ref6, _results;
         div = $(document.createElement('div')).addClass('note').appendTo(parent);
@@ -1064,6 +1206,20 @@
               x: offset.left,
               y: offset.top
             });
+          }
+        });
+        div.bind('dragover', function(e) {
+          if (_this.app.dragHasType(e, 'custom/note')) return e.preventDefault();
+        });
+        div.bind('drop', function(e) {
+          var noteData;
+          noteData = _this.app.dragGetType(e, 'custom/note');
+          if (noteData != null ? noteData.id : void 0) {
+            log('Dropped note:', noteData);
+            if (_this.createNoteLink(note, noteData.id)) {
+              e.stopPropagation();
+              return false;
+            }
           }
         });
         div.bind('dblclick', function(e) {
@@ -1133,6 +1289,7 @@
           loadNote(item);
           _this.notes.push(item);
         }
+        renderLinks(arr);
         return renderBookmarks(parent);
       });
     };
@@ -1150,7 +1307,7 @@
     Notepad.prototype.stick = true;
 
     Notepad.prototype.loadSheet = function(index, div) {
-      var canvas, clearSelector, divContent, divTitle, height, inRectangle, notesInRectangle, offsetToCoordinates, sheet, stickToGrid, template, templateConfig, width, _ref,
+      var canvas, clearSelector, divContent, divTitle, height, inRectangle, notesInRectangle, offsetToCoordinates, sheet, stickToGrid, template, templateConfig, width, zoom, _ref,
         _this = this;
       clearSelector = function() {
         if (_this.selectorDiv) {
@@ -1209,6 +1366,7 @@
       templateConfig = this.app.getTemplateConfig(template);
       divContent = div.find('.sheet_content');
       canvas = canto(div.find('.sheet-canvas').get(0));
+      canvas.reset();
       width = Math.floor(template.width / this.zoomFactor);
       height = Math.floor(template.height / this.zoomFactor);
       divContent.css({
@@ -1372,10 +1530,9 @@
       });
       canvas.width = divContent.width();
       canvas.height = divContent.height();
-      if (templateConfig) {
-        templateConfig.render(template, sheet, canvas, divContent.width() / template.width);
-      }
-      this.loadNotes(sheet, divContent);
+      zoom = divContent.width() / template.width;
+      if (templateConfig) templateConfig.render(template, sheet, canvas, zoom);
+      this.loadNotes(sheet, divContent, canvas, zoom);
       return div;
     };
 
@@ -1620,7 +1777,6 @@
         }
         return params.font = '' + (Math.round(fontPixels * 100) / 100) + 'px Arial';
       };
-      canvas.reset();
       _results = [];
       for (_i = 0, _len = data.length; _i < _len; _i++) {
         item = data[_i];

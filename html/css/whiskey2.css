@@ -269,3 +269,16 @@
     top: 0;
     display: block;
 }
+
+.note-dots {
+    position: absolute;
+    z-index: 5;
+}
+
+.note-dot {
+    width: 0;
+    height: 0;
+    border: 1px solid #ff0000;
+    margin-bottom: 0.2em;
+    cursor: pointer;
+}

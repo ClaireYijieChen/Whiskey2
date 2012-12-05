@@ -667,7 +667,99 @@ class Notepad
   preciseEm: (value) ->
     return Math.floor(value*100/@zoomFactor)/100
 
-  loadNotes: (sheet, parent) ->
+  createNoteLink: (note, noteID) ->
+    if note.id is noteID
+      log 'Same note'
+      return no
+    index = @app.findByID @notes, noteID
+    if -1 is index
+      log 'From other page'
+      return no
+    otherNote = @notes[index]
+    if note.sheet_id isnt otherNote.sheet_id
+      log 'From other sheet'
+      return no
+    links = otherNote.links
+    if not links
+      otherNote.links = []
+      links = otherNote.links
+    index = @app.findByID links, note.id
+    if index isnt -1
+      log 'Already created'
+      return no
+    links.push(id: note.id)
+    @app.manager.save 'notes', otherNote, (err) =>
+      if err then return @app.showError err
+      @reloadSheets()
+    return yes
+
+  loadNotes: (sheet, parent, canvas, zoom) ->
+    renderArrow = (div1, div2, color) =>
+      lineWidth = 1.5
+      width = lineWidth*zoom
+      gap = width
+      box1 = x: div1.position().left-gap, y: div1.position().top-gap, w: div1.outerWidth()+2*gap, h: div1.outerHeight()+2*gap
+      box2 = x: div2.position().left-gap, y: div2.position().top-gap, w: div2.outerWidth()+2*gap, h: div2.outerHeight()+2*gap
+      x1 = box1.x+box1.w/2
+      x2 = box2.x+box2.w/2
+      y1 = box1.y+box1.h/2
+      y2 = box2.y+box2.h/2
+      x0 = if x1<x2 then box2.x else box2.x+box2.w
+      y0 = if y1<y2 then box2.y else box2.y+box2.h
+      if x1 is x2
+        # vertical line
+        x0 = x1
+      else if y1 is y2
+        # horizontal line
+        y0 = y1
+      else
+        a = (y2-y1)/(x2-x1)
+        b = y1-x1*a
+        _y0 = x0*a+b
+        if box2.y <_y0 < (box2.y+box2.h)
+          # Within sizes
+          y0 = _y0
+        else
+          x0 = (y0-b)/a
+      canvas.beginPath().moveTo(x1, y1).lineTo(x0, y0).stroke(lineWidth: width, strokeStyle: color, lineCap: 'round').endPath()
+
+    renderLinks = (notes) =>
+      dotsRadius = 2
+      for note in notes
+        links = note.links ? []
+        if links.length is 0 then continue
+        dotsDiv = $(document.createElement('div')).addClass('note-dots').appendTo(parent)
+        x = @preciseEm note.x-2*dotsRadius
+        y = @preciseEm note.y
+        radius = @preciseEm dotsRadius
+        dotsDiv.css left: "#{x}em", top: "#{y}em"
+        for i in [0...links.length]
+          link = links[i]
+          index = @app.findByID notes, link.id
+          createLink = yes
+          other = null
+          if index is -1
+            createLink = no
+          else
+            other = @notes[index]
+            if other.sheet_id isnt note.sheet_id
+              createLink = no
+          if createLink
+            renderArrow $('#note'+note.id), $('#note'+other.id), '#ffaaaa', 6
+          dotDiv = $(document.createElement('div')).addClass('note-dot').appendTo(dotsDiv)
+          dotDiv.css 'border-width': "#{radius}em", 'border-radius': "#{radius}em"
+          dotDiv.css 'border-color': (if createLink then '#008800' else '#ff0000')
+          do (i, link, note) =>
+            dotDiv.bind 'dblclick', (e) =>
+              @app.showPrompt 'Are you sure want to remove link?', =>
+                note.links.splice(i, 1)
+                @app.manager.save 'notes', note, (err) =>
+                  if err then return @app.showError err
+                  @reloadSheets()
+              e.stopPropagation()
+              e.preventDefault()
+              return no
+
     loadNote = (note) =>
       # log 'loadNote', note
       div = $(document.createElement('div')).addClass('note').appendTo(parent)
@@ -692,6 +784,16 @@ class Notepad
           @app.dragSetType e, 'custom/note', {ids: ids, x: offset.left, y: offset.top}
         else
           @app.dragSetType e, 'custom/note', {id: note.id, x: offset.left, y: offset.top}
+      div.bind 'dragover', (e) =>
+        if (@app.dragHasType e, 'custom/note')
+          e.preventDefault()
+      div.bind 'drop', (e) =>
+        noteData = @app.dragGetType e, 'custom/note'
+        if noteData?.id
+          log 'Dropped note:', noteData
+          if @createNoteLink note, noteData.id
+            e.stopPropagation()
+            return no
       div.bind 'dblclick', (e) =>
         @showNotesDialog sheet, note, () =>
           @reloadSheets()
@@ -733,6 +835,7 @@ class Notepad
       for item in arr
         loadNote item
         @notes.push item
+      renderLinks(arr)
       renderBookmarks(parent)
   noteWidths: [50, 75, 90, 125]
   noteDefaultWidth: 1
@@ -778,6 +881,7 @@ class Notepad
     templateConfig = @app.getTemplateConfig template
     divContent = div.find('.sheet_content')
     canvas = canto(div.find('.sheet-canvas').get(0))
+    canvas.reset()
     width = Math.floor(template.width/@zoomFactor)
     height = Math.floor(template.height/@zoomFactor)
     divContent.css width: "#{width}em", height: "#{height}em"
@@ -886,9 +990,10 @@ class Notepad
     # log 'Before render:', divContent.width(), divContent.height()
     canvas.width = divContent.width()
     canvas.height = divContent.height()
+    zoom = divContent.width()/template.width
     if templateConfig
-      templateConfig.render template, sheet, canvas, divContent.width()/template.width
-    @loadNotes sheet, divContent
+      templateConfig.render template, sheet, canvas, zoom
+    @loadNotes sheet, divContent, canvas, zoom
     return div
 
 class TemplateManager
@@ -1008,7 +1113,9 @@ class TemplateManager
             return no
       if not found then @disableForm()
     , order: ['tag', 'name']
+
 class DrawTemplate
+
   constructor: (@app) ->
 
   render: (tmpl, sheet, canvas, zoom) ->
@@ -1032,7 +1139,6 @@ class DrawTemplate
         when 1 then fontPixels = zoom*6.5
         when 2 then fontPixels = zoom*7.5
       params.font = ''+(Math.round(fontPixels*100)/100)+'px Arial'
-    canvas.reset()
     for item in data
       canvas.save()
       params = {}
