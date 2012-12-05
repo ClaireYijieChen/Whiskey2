@@ -7,6 +7,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
 import org.kvj.bravo7.ipc.RemoteServiceConnector;
 import org.kvj.lima1.sync.PJSONObject;
 import org.kvj.lima1.sync.QueryOperator;
@@ -430,5 +432,49 @@ public class DataController {
 	public DrawTemplate getTemplateConfig(TemplateInfo info) {
 		DrawTemplate tmplConfig = templateConfigs.get(info.type);
 		return tmplConfig;
+	}
+
+	public boolean createLink(NoteInfo note, NoteInfo other) {
+		SyncService svc = getRemote();
+		if (null == svc) { // No connection
+			Log.w(TAG, "No service");
+			return false;
+		}
+		if (note.id == other.id) { // Same note
+			Log.w(TAG, "Same note");
+			return false;
+		}
+		try { // Remote and JSON errors
+			PJSONObject noteObj = findOne("notes", note.id);
+			PJSONObject otherObj = findOne("notes", other.id);
+			if (null == noteObj || null == otherObj) {
+				Log.e(TAG, "Note not found");
+				return false;
+			}
+			if (noteObj.optLong("sheet_id", 0) != otherObj.optLong("sheet_id", 0)) {
+				Log.e(TAG, "Different sheets");
+				return false;
+			}
+			JSONArray links = noteObj.optJSONArray("links");
+			if (null == links) {
+				links = new JSONArray();
+			}
+			for (int i = 0; i < links.length(); i++) {
+				if (links.getJSONObject(i).optLong("id", -1) == other.id) {
+					// Already created
+					Log.e(TAG, "Already created");
+					return false;
+				}
+			}
+			JSONObject obj = new JSONObject();
+			obj.put("id", other.id);
+			links.put(obj);
+			noteObj.put("links", links);
+			svc.update("notes", noteObj);
+			return true;
+		} catch (Exception e) {
+			Log.e(TAG, "Error creating link:", e);
+		}
+		return false;
 	}
 }

@@ -18,6 +18,7 @@ import android.content.Context;
 import android.os.AsyncTask;
 import android.support.v4.app.DialogFragment;
 import android.support.v4.app.FragmentActivity;
+import android.text.SpannableStringBuilder;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.TypedValue;
@@ -246,7 +247,7 @@ public class MainSurface extends RelativeLayout {
 
 	private void decorateNoteView(TextView view, NoteInfo info) {
 		if (android.os.Build.VERSION.SDK_INT >= 11) {
-			new NoteDnDDecorator(view, info);
+			NoteDnDDecorator.decorate(adapter.getController(), view, info);
 		}
 	}
 
@@ -335,7 +336,8 @@ public class MainSurface extends RelativeLayout {
 		textView.setTextSize(TypedValue.COMPLEX_UNIT_PX, TEXT_SIZE / page.zoomFactor);
 		textView.setFocusable(true);
 		textView.setFocusableInTouchMode(true);
-		textView.setText(info.text);
+		SpannableStringBuilder text = new SpannableStringBuilder(info.text);
+		textView.setText(text);
 		addView(textView, params);
 		textView.setOnClickListener(new OnClickListener() {
 
