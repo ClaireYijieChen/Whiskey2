@@ -115,6 +115,7 @@ public class PagerItemFragment extends SherlockFragment implements OnPageZoomLis
 					// Zoom out
 					surface.zoom -= MainSurface.ZOOM_STEP;
 					surface.createLayout();
+					hideZoomTask.schedule();
 				}
 			}
 		});
@@ -125,6 +126,7 @@ public class PagerItemFragment extends SherlockFragment implements OnPageZoomLis
 				if (null != surface) {
 					surface.zoom += MainSurface.ZOOM_STEP;
 					surface.createLayout();
+					hideZoomTask.schedule();
 				}
 			}
 		});

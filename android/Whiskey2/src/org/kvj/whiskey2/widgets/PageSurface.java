@@ -40,8 +40,8 @@ public class PageSurface extends View {
 	private static final float FONT_WIDTH = (float) 0.5;
 	protected static final String TAG = "PageSurface";
 	private static final float LINK_WIDTH = 1.2f;
-	private static final float DOT_SIZE = 10;
-	private static final float DOT_GAP = 2;
+	private static final float DOT_SIZE = 15;
+	private static final float DOT_GAP = 8;
 	int marginLeft = 0;
 	int marginTop = 0;
 	float zoomFactor = 1;
