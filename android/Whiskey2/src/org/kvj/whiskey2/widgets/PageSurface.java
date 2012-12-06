@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.kvj.bravo7.SuperActivity;
 import org.kvj.whiskey2.R;
 import org.kvj.whiskey2.data.NoteInfo;
 import org.kvj.whiskey2.data.SheetInfo;
@@ -19,8 +20,12 @@ import android.graphics.Paint.Cap;
 import android.graphics.Paint.Style;
 import android.util.Log;
 import android.view.KeyEvent;
+import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.LinearLayout;
+import android.widget.RelativeLayout;
 
 public class PageSurface extends View {
 
@@ -35,6 +40,8 @@ public class PageSurface extends View {
 	private static final float FONT_WIDTH = (float) 0.5;
 	protected static final String TAG = "PageSurface";
 	private static final float LINK_WIDTH = 1.2f;
+	private static final float DOT_SIZE = 10;
+	private static final float DOT_GAP = 2;
 	int marginLeft = 0;
 	int marginTop = 0;
 	float zoomFactor = 1;
@@ -54,9 +61,11 @@ public class PageSurface extends View {
 	private boolean linksDrawn = false;
 	private boolean needLinksData = false;
 	List<LinkInfo> links = new ArrayList<PageSurface.LinkInfo>();
+	private LayoutInflater inflater = null;
 
 	public PageSurface(Context context) {
 		super(context);
+		inflater = (LayoutInflater) getContext().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
 		paint.setAntiAlias(true);
 		density = getContext().getResources().getDisplayMetrics().density;
 		setFocusable(true);
@@ -131,17 +140,20 @@ public class PageSurface extends View {
 						// No links
 						continue;
 					}
+					LinearLayout toolbar = createLinksToolbar(note);
 					for (int i = 0; i < note.links.length(); i++) {
 						// Every link
 						JSONObject link = note.links.getJSONObject(i);
 						boolean linkOK = true;
-						int index = findInNotes(link.optLong("id", -1));
+						long linkID = link.optLong("id", -1);
+						int index = findInNotes(linkID);
 						if (index == -1) { // Not found
 							linkOK = false;
 						} else {
 							NoteInfo other = notes.get(index);
 							links.add(renderArrow(note, other, "#ffaaaa"));
 						}
+						createLinkButton(note, linkID, toolbar, linkOK);
 					}
 					Log.i(TAG, "Links found: " + links.size());
 				}
@@ -157,6 +169,54 @@ public class PageSurface extends View {
 			linkPaint.setStrokeCap(Cap.ROUND);
 			canvas.drawLine(link.x1, link.y1, link.x2, link.y2, linkPaint);
 		}
+	}
+
+	private void createLinkButton(final NoteInfo note, final long id, LinearLayout toolbar, boolean linkOK) {
+		View button = new View(getContext());
+		button.setFocusable(false);
+		LinearLayout.LayoutParams params = new LinearLayout.LayoutParams((int) (density * DOT_SIZE),
+				(int) (density * DOT_SIZE));
+		params.bottomMargin = (int) (density * DOT_GAP);
+		button.setBackgroundResource(linkOK ? R.drawable.link_button_bg_ok : R.drawable.link_button_bg_ng);
+		toolbar.addView(button, params);
+		button.setOnClickListener(new OnClickListener() {
+
+			@Override
+			public void onClick(View v) {
+				SuperActivity.notifyUser(getContext(), "Link: " + id);
+			}
+		});
+		button.setOnLongClickListener(new OnLongClickListener() {
+
+			@Override
+			public boolean onLongClick(View v) {
+				SuperActivity.showQuestionDialog(getContext(), "Remove link?", "Are you sure want to remove link?",
+						new Runnable() {
+
+							@Override
+							public void run() {
+								removeLink(note, id);
+							}
+						});
+				return true;
+			}
+		});
+	}
+
+	private LinearLayout createLinksToolbar(NoteInfo note) {
+		ViewGroup parent = (ViewGroup) getParent();
+		LinearLayout toolbar = (LinearLayout) inflater.inflate(R.layout.links_toolbar, parent, false);
+		RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT,
+				RelativeLayout.LayoutParams.WRAP_CONTENT);
+		params.addRule(RelativeLayout.ALIGN_PARENT_TOP);
+		params.addRule(RelativeLayout.ALIGN_PARENT_LEFT);
+
+		params.leftMargin = (int) (note.x / zoomFactor + marginLeft - density * (DOT_SIZE + DOT_GAP));
+		params.topMargin = (int) (note.y / zoomFactor + marginTop);
+		parent.addView(toolbar, params);
+		toolbar.setVisibility(View.GONE);
+		note.linksToolbar = toolbar;
+		return toolbar;
 	}
 
 	private LinkInfo renderArrow(NoteInfo note1, NoteInfo note2, String color) {
@@ -240,5 +300,9 @@ public class PageSurface extends View {
 
 	public void setTemplateConfig(DrawTemplate templateConfig) {
 		this.templateConfig = templateConfig;
+	}
+
+	public boolean removeLink(NoteInfo note, long linkID) {
+		return false;
 	}
 }

@@ -118,8 +118,6 @@ public class MainSurface extends RelativeLayout {
 		int contentHeight = template.height;
 		float pageHeight = height - 2 * pageMargin;
 		float pageWidth = pageHeight * contentWidth / contentHeight;
-		// Log.i(TAG, "Calc page size pass 1: " + pageWidth + "x" + pageHeight +
-		// ", " + width + "x" + height);
 		if (pageWidth > width - 2 * pageMargin) { // Too wide
 			pageWidth = width - 2 * pageMargin;
 			// Recalculate height
@@ -258,7 +256,16 @@ public class MainSurface extends RelativeLayout {
 		if (null == sheet) {
 			return;
 		}
-		final PageSurface page = new PageSurface(getContext());
+		final PageSurface page = new PageSurface(getContext()) {
+			@Override
+			public boolean removeLink(NoteInfo note, long linkID) {
+				if (adapter.getController().removeLink(note, linkID)) {
+					adapter.getController().notifyNoteChanged(note);
+					return true;
+				}
+				return false;
+			}
+		};
 		final TemplateInfo template = adapter.getController().getTemplate(sheet.templateID);
 		DrawTemplate templateConfig = adapter.getController().getTemplateConfig(template);
 		if (null != templateConfig) { // Have - instruct PageSurface
@@ -351,6 +358,9 @@ public class MainSurface extends RelativeLayout {
 			@Override
 			public void onFocusChange(View v, boolean hasFocus) {
 				// Log.i(TAG, "Focus changed: " + info.id + ", " + hasFocus);
+				if (null != info.linksToolbar) { // Have links toolbar
+					info.linksToolbar.setVisibility(hasFocus ? View.VISIBLE : View.GONE);
+				}
 				if (hasFocus) { // Bring to front first
 					textView.bringToFront();
 					toolbarParams.addRule(RelativeLayout.ALIGN_TOP, textView.getId());

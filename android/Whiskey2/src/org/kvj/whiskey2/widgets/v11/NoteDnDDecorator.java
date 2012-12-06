@@ -51,6 +51,8 @@ public class NoteDnDDecorator {
 			@Override
 			public boolean onDrag(View v, DragEvent event) {
 				switch (event.getAction()) {
+				case DragEvent.ACTION_DRAG_LOCATION:
+				case DragEvent.ACTION_DRAG_ENTERED:
 				case DragEvent.ACTION_DRAG_STARTED:
 					if (event.getClipDescription().hasMimeType(NoteDnDDecorator.MIME_NOTE)) {
 						return true;

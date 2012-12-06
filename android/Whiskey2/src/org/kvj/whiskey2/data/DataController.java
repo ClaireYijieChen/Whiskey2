@@ -477,4 +477,40 @@ public class DataController {
 		}
 		return false;
 	}
+
+	public boolean removeLink(NoteInfo note, long linkID) {
+		SyncService svc = getRemote();
+		if (null == svc) { // No connection
+			Log.w(TAG, "No service");
+			return false;
+		}
+		try { // Remote and JSON errors
+			PJSONObject noteObj = findOne("notes", note.id);
+			if (null == noteObj) {
+				Log.e(TAG, "Note not found");
+				return false;
+			}
+			JSONArray links = noteObj.optJSONArray("links");
+			if (null == links) {
+				return true;
+			}
+			boolean changed = false;
+			JSONArray newLinksArr = new JSONArray();
+			for (int i = 0; i < links.length(); i++) {
+				if (links.getJSONObject(i).optLong("id", -1) == linkID) {
+					changed = true;
+				} else {
+					newLinksArr.put(links.getJSONObject(i));
+				}
+			}
+			if (changed) { // Need update
+				noteObj.put("links", newLinksArr);
+				svc.update("notes", noteObj);
+			}
+			return true;
+		} catch (Exception e) {
+			Log.e(TAG, "Error creating link:", e);
+		}
+		return false;
+	}
 }

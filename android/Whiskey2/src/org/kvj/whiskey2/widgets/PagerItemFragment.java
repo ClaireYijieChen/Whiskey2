@@ -1,13 +1,12 @@
 package org.kvj.whiskey2.widgets;
 
+import org.kvj.bravo7.util.DelayedTask;
 import org.kvj.whiskey2.R;
 import org.kvj.whiskey2.widgets.MainSurface.OnPageZoomListener;
 import org.kvj.whiskey2.widgets.adapters.SheetsAdapter;
 
 import android.app.Activity;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Message;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -26,12 +25,19 @@ public class PagerItemFragment extends SherlockFragment implements OnPageZoomLis
 	MainSurface surface = null;
 	private SheetsAdapter adapter = null;
 	private long notepadID = -1;
-	Handler hideZoomHandler = new Handler(new Handler.Callback() {
+	DelayedTask hideZoomTask = new DelayedTask(ZOOM_HIDE_MSEC, new Runnable() {
 
 		@Override
-		public boolean handleMessage(Message msg) {
-			zoomButtons.hide();
-			return true;
+		public void run() {
+			if (null != getActivity()) { // Have Activity
+				getActivity().runOnUiThread(new Runnable() {
+
+					@Override
+					public void run() {
+						zoomButtons.hide();
+					}
+				});
+			}
 		}
 	});
 
@@ -143,7 +149,6 @@ public class PagerItemFragment extends SherlockFragment implements OnPageZoomLis
 	@Override
 	public void onShow() {
 		zoomButtons.show();
-		hideZoomHandler.removeMessages(0);
-		hideZoomHandler.sendEmptyMessageDelayed(0, ZOOM_HIDE_MSEC);
+		hideZoomTask.schedule();
 	}
 }

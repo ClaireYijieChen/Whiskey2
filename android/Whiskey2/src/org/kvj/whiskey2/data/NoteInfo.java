@@ -4,6 +4,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.kvj.lima1.sync.PJSONObject;
 
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 public class NoteInfo {
@@ -19,6 +20,7 @@ public class NoteInfo {
 	public boolean collapsed = true;
 	public long sheetID = -1;
 	private PJSONObject original = null;
+	public LinearLayout linksToolbar = null;
 
 	public static NoteInfo fromJSON(PJSONObject obj) throws JSONException {
 		NoteInfo info = new NoteInfo();

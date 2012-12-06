@@ -66,8 +66,12 @@ public class NotepadActivity extends SherlockFragmentActivity implements Control
 	@Override
 	public boolean onOptionsItemSelected(MenuItem item) {
 		switch (item.getItemId()) {
-		case android.R.id.home: // Run sync
-			sheetSelector.collapseExpand(false);
+		case android.R.id.home: // Collapse/expand
+			if (sheetSelector.collapsed) { //
+				sheetSelector.collapseExpand(false);
+			} else {
+				sheetSelector.collapseExpand(true);
+			}
 			break;
 		case R.id.menu_sync: // Run sync
 			sync();

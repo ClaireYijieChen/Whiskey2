@@ -21,4 +21,6 @@
 	<dimen name="note_br_focused_size">2dp</dimen>
 	<color name="float_toolbar_bg">#ff888888</color>
 				    
+	<color name="link_bg_ok">#ff00aa00</color>    
+	<color name="link_bg_ng">#ffff0000</color>
 </resources>
