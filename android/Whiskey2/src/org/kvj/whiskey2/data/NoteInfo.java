@@ -1,11 +1,14 @@
 package org.kvj.whiskey2.data;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.kvj.lima1.sync.PJSONObject;
 
+import android.view.View;
 import android.widget.LinearLayout;
-import android.widget.TextView;
 
 public class NoteInfo {
 	public long id = -1;
@@ -16,11 +19,13 @@ public class NoteInfo {
 	public int y;
 	public int color;
 	public JSONArray links = null;
-	public TextView widget = null;
+	public JSONArray files = null;
+	public View widget = null;
 	public boolean collapsed = true;
 	public long sheetID = -1;
 	private PJSONObject original = null;
 	public LinearLayout linksToolbar = null;
+	public Map<String, String> fileCache = new HashMap<String, String>();
 
 	public static NoteInfo fromJSON(PJSONObject obj) throws JSONException {
 		NoteInfo info = new NoteInfo();
@@ -34,6 +39,7 @@ public class NoteInfo {
 		info.sheetID = obj.getLong("sheet_id");
 		info.original = obj;
 		info.links = obj.optJSONArray("links");
+		info.files = obj.optJSONArray("files");
 		return info;
 	}
 
@@ -50,6 +56,9 @@ public class NoteInfo {
 		original.put("sheet_id", sheetID);
 		if (null != links) { // Add links
 			original.put("links", links);
+		}
+		if (null != files) { // Add files
+			original.put("files", files);
 		}
 		return original;
 	}

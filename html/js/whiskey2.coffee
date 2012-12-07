@@ -32,6 +32,7 @@ class Whiskey2
       if error
         @manager = null
         @showError error
+      @manager.storage.cache = new HTML5CacheProvider(@oauth, @manager.app, 1280)
       @showAlert 'Application started', severity: 'success'
       @oauth.on_token_error = =>
         @showLoginDialog()
@@ -68,6 +69,9 @@ class Whiskey2
       e.originalEvent.dataTransfer.setData type, JSON.stringify(value)
 
   dragGetType: (e, type) ->
+    log 'getType:', e?.originalEvent?.dataTransfer, e?.originalEvent?.dataTransfer.files
+    if 'Files' is type and e?.originalEvent?.dataTransfer?.files
+      return e.originalEvent.dataTransfer.files
     if e?.originalEvent?.dataTransfer?.getData
       try
         return JSON.parse(e?.originalEvent?.dataTransfer?.getData(type))
@@ -785,7 +789,7 @@ class Notepad
         else
           @app.dragSetType e, 'custom/note', {id: note.id, x: offset.left, y: offset.top}
       div.bind 'dragover', (e) =>
-        if (@app.dragHasType e, 'custom/note')
+        if (@app.dragHasType e, 'custom/note') or (@app.dragHasType e, 'Files')
           e.preventDefault()
       div.bind 'drop', (e) =>
         noteData = @app.dragGetType e, 'custom/note'
@@ -794,19 +798,82 @@ class Notepad
           if @createNoteLink note, noteData.id
             e.stopPropagation()
             return no
+        files = @app.dragGetType e, 'Files'
+        if files and files.length > 0
+          # Upload first file
+          @app.manager.storage.uploadFile files[0], (err, name) =>
+            if err then return @app.showError err
+            if not note.files
+              note.files = []
+            note.files.push name
+            @app.manager.save 'notes', note, (err) =>
+              if err then return @app.showError err
+              log 'Note saved with attachment'
+              @reloadSheets()
       div.bind 'dblclick', (e) =>
         @showNotesDialog sheet, note, () =>
           @reloadSheets()
         e.preventDefault()
         e.stopPropagation()
       div.addClass('note-color0 note-color'+(note.color ? 0))
-      width = note.width ? @noteWidths[@noteDefaultWidth]
-      width = @preciseEm width
+      notewidth = note.width ? @noteWidths[@noteDefaultWidth]
+      width = @preciseEm notewidth
       x = @preciseEm(note.x ? 0)
       y = @preciseEm(note.y ? 0)
       div.css width: "#{width}em", left: "#{x}em", top: "#{y}em"
+      files = note.files ? []
       if note.collapsed
         div.addClass('note-collapsed')
+      renderIcon = (fi) =>
+        ICON_SIZE = 12
+        file = files[fi]
+        log 'renderIcon', file, fi
+        attDiv = $(document.createElement('div')).addClass('note-file').appendTo(div)
+        iconsize = @preciseEm ICON_SIZE
+        iconsizeexpanded = notewidth-8
+        attDiv.css width: "#{iconsize}em", height: "#{iconsize}em"
+        if _.endsWith(file, '.jpg')
+          # image
+          attDiv.addClass 'note-file-image'
+          img = $(document.createElement('img'))
+          img.css visibility: 'hidden'
+          img.bind 'load', () =>
+            mul = img.width()/iconsizeexpanded
+            expwidth = @preciseEm iconsizeexpanded
+            expheight = @preciseEm(img.height() / mul)
+            mul = Math.max(img.width(), img.height()) / ICON_SIZE
+            iconwidth = @preciseEm(img.width()/mul)
+            iconheight = @preciseEm(img.height()/mul)
+            div.bind 'mouseover', () =>
+              attDiv.css width: "#{expwidth}em", height: "#{expheight}em"
+              attDiv.addClass 'note-file-image-hover'
+            div.bind 'mouseout', () =>
+              attDiv.css width: "#{iconwidth}em", height: "#{iconheight}em"
+              attDiv.removeClass 'note-file-image-hover'
+            attDiv.css width: "#{iconwidth}em", height: "#{iconheight}em"
+            img.addClass('note-image')
+            img.css visibility: 'visible'
+          @app.manager.storage.getFile file, (err, link) =>
+            if not err
+              img.attr 'src', link
+              img.appendTo attDiv
+        else
+          attDiv.addClass 'note-file-other'
+          span = $(document.createElement('span')).addClass('note-file-other-text').appendTo(attDiv)
+          span.text(file.substr(file.lastIndexOf('.')))
+        attDiv.bind 'dblclick', (e) =>
+          e.stopPropagation()
+          e.preventDefault()
+          @app.showPrompt 'Are you sure want to delete file '+file+'?', () =>
+            @app.manager.storage.removeFile file, (err) =>
+              if err then return @app.showError err
+              note.files.splice fi, 1
+              @app.manager.save 'notes', note, (err) =>
+                if err then return @app.showError err
+                @reloadSheets()
+          return no
+      for fi in [0...files.length]
+        renderIcon fi
       lines = (note.text ? '').split '\n'
       for i in [0...lines.length]
         line = lines[i]

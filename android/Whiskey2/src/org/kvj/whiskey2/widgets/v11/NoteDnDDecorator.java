@@ -16,7 +16,6 @@ import android.view.DragEvent;
 import android.view.View;
 import android.view.View.OnDragListener;
 import android.view.View.OnLongClickListener;
-import android.widget.TextView;
 
 @TargetApi(Build.VERSION_CODES.HONEYCOMB)
 public class NoteDnDDecorator {
@@ -29,7 +28,7 @@ public class NoteDnDDecorator {
 	static final String MIME_NOTE = "custom/note";
 	protected static final String TAG = "NoteDnD";
 
-	public static void decorate(final DataController controller, final TextView view, final NoteInfo note) {
+	public static void decorate(final DataController controller, final View view, final NoteInfo note) {
 		view.setOnLongClickListener(new OnLongClickListener() {
 
 			@Override

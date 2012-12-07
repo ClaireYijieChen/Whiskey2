@@ -49,6 +49,7 @@
           _this.manager = null;
           _this.showError(error);
         }
+        _this.manager.storage.cache = new HTML5CacheProvider(_this.oauth, _this.manager.app, 1280);
         _this.showAlert('Application started', {
           severity: 'success'
         });
@@ -104,10 +105,14 @@
     };
 
     Whiskey2.prototype.dragGetType = function(e, type) {
-      var _ref, _ref2, _ref3, _ref4;
-      if (e != null ? (_ref = e.originalEvent) != null ? (_ref2 = _ref.dataTransfer) != null ? _ref2.getData : void 0 : void 0 : void 0) {
+      var _ref, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8;
+      log('getType:', e != null ? (_ref = e.originalEvent) != null ? _ref.dataTransfer : void 0 : void 0, e != null ? (_ref2 = e.originalEvent) != null ? _ref2.dataTransfer.files : void 0 : void 0);
+      if ('Files' === type && (e != null ? (_ref3 = e.originalEvent) != null ? (_ref4 = _ref3.dataTransfer) != null ? _ref4.files : void 0 : void 0 : void 0)) {
+        return e.originalEvent.dataTransfer.files;
+      }
+      if (e != null ? (_ref5 = e.originalEvent) != null ? (_ref6 = _ref5.dataTransfer) != null ? _ref6.getData : void 0 : void 0 : void 0) {
         try {
-          return JSON.parse(e != null ? (_ref3 = e.originalEvent) != null ? (_ref4 = _ref3.dataTransfer) != null ? _ref4.getData(type) : void 0 : void 0 : void 0);
+          return JSON.parse(e != null ? (_ref7 = e.originalEvent) != null ? (_ref8 = _ref7.dataTransfer) != null ? _ref8.getData(type) : void 0 : void 0 : void 0);
         } catch (e) {
           return null;
         }
@@ -1167,7 +1172,7 @@
         return _results;
       };
       loadNote = function(note) {
-        var div, i, line, lines, width, x, y, _ref, _ref2, _ref3, _ref4, _ref5, _ref6, _results;
+        var div, fi, files, i, line, lines, notewidth, renderIcon, width, x, y, _ref, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8, _results;
         div = $(document.createElement('div')).addClass('note').appendTo(parent);
         div.attr({
           draggable: true,
@@ -1209,10 +1214,12 @@
           }
         });
         div.bind('dragover', function(e) {
-          if (_this.app.dragHasType(e, 'custom/note')) return e.preventDefault();
+          if ((_this.app.dragHasType(e, 'custom/note')) || (_this.app.dragHasType(e, 'Files'))) {
+            return e.preventDefault();
+          }
         });
         div.bind('drop', function(e) {
-          var noteData;
+          var files, noteData;
           noteData = _this.app.dragGetType(e, 'custom/note');
           if (noteData != null ? noteData.id : void 0) {
             log('Dropped note:', noteData);
@@ -1220,6 +1227,19 @@
               e.stopPropagation();
               return false;
             }
+          }
+          files = _this.app.dragGetType(e, 'Files');
+          if (files && files.length > 0) {
+            return _this.app.manager.storage.uploadFile(files[0], function(err, name) {
+              if (err) return _this.app.showError(err);
+              if (!note.files) note.files = [];
+              note.files.push(name);
+              return _this.app.manager.save('notes', note, function(err) {
+                if (err) return _this.app.showError(err);
+                log('Note saved with attachment');
+                return _this.reloadSheets();
+              });
+            });
           }
         });
         div.bind('dblclick', function(e) {
@@ -1230,8 +1250,8 @@
           return e.stopPropagation();
         });
         div.addClass('note-color0 note-color' + ((_ref = note.color) != null ? _ref : 0));
-        width = (_ref2 = note.width) != null ? _ref2 : _this.noteWidths[_this.noteDefaultWidth];
-        width = _this.preciseEm(width);
+        notewidth = (_ref2 = note.width) != null ? _ref2 : _this.noteWidths[_this.noteDefaultWidth];
+        width = _this.preciseEm(notewidth);
         x = _this.preciseEm((_ref3 = note.x) != null ? _ref3 : 0);
         y = _this.preciseEm((_ref4 = note.y) != null ? _ref4 : 0);
         div.css({
@@ -1239,10 +1259,90 @@
           left: "" + x + "em",
           top: "" + y + "em"
         });
+        files = (_ref5 = note.files) != null ? _ref5 : [];
         if (note.collapsed) div.addClass('note-collapsed');
-        lines = ((_ref5 = note.text) != null ? _ref5 : '').split('\n');
+        renderIcon = function(fi) {
+          var ICON_SIZE, attDiv, file, iconsize, iconsizeexpanded, img, span;
+          ICON_SIZE = 12;
+          file = files[fi];
+          log('renderIcon', file, fi);
+          attDiv = $(document.createElement('div')).addClass('note-file').appendTo(div);
+          iconsize = _this.preciseEm(ICON_SIZE);
+          iconsizeexpanded = notewidth - 8;
+          attDiv.css({
+            width: "" + iconsize + "em",
+            height: "" + iconsize + "em"
+          });
+          if (_.endsWith(file, '.jpg')) {
+            attDiv.addClass('note-file-image');
+            img = $(document.createElement('img'));
+            img.css({
+              visibility: 'hidden'
+            });
+            img.bind('load', function() {
+              var expheight, expwidth, iconheight, iconwidth, mul;
+              mul = img.width() / iconsizeexpanded;
+              expwidth = _this.preciseEm(iconsizeexpanded);
+              expheight = _this.preciseEm(img.height() / mul);
+              mul = Math.max(img.width(), img.height()) / ICON_SIZE;
+              iconwidth = _this.preciseEm(img.width() / mul);
+              iconheight = _this.preciseEm(img.height() / mul);
+              div.bind('mouseover', function() {
+                attDiv.css({
+                  width: "" + expwidth + "em",
+                  height: "" + expheight + "em"
+                });
+                return attDiv.addClass('note-file-image-hover');
+              });
+              div.bind('mouseout', function() {
+                attDiv.css({
+                  width: "" + iconwidth + "em",
+                  height: "" + iconheight + "em"
+                });
+                return attDiv.removeClass('note-file-image-hover');
+              });
+              attDiv.css({
+                width: "" + iconwidth + "em",
+                height: "" + iconheight + "em"
+              });
+              img.addClass('note-image');
+              return img.css({
+                visibility: 'visible'
+              });
+            });
+            _this.app.manager.storage.getFile(file, function(err, link) {
+              if (!err) {
+                img.attr('src', link);
+                return img.appendTo(attDiv);
+              }
+            });
+          } else {
+            attDiv.addClass('note-file-other');
+            span = $(document.createElement('span')).addClass('note-file-other-text').appendTo(attDiv);
+            span.text(file.substr(file.lastIndexOf('.')));
+          }
+          return attDiv.bind('dblclick', function(e) {
+            e.stopPropagation();
+            e.preventDefault();
+            _this.app.showPrompt('Are you sure want to delete file ' + file + '?', function() {
+              return _this.app.manager.storage.removeFile(file, function(err) {
+                if (err) return _this.app.showError(err);
+                note.files.splice(fi, 1);
+                return _this.app.manager.save('notes', note, function(err) {
+                  if (err) return _this.app.showError(err);
+                  return _this.reloadSheets();
+                });
+              });
+            });
+            return false;
+          });
+        };
+        for (fi = 0, _ref6 = files.length; 0 <= _ref6 ? fi < _ref6 : fi > _ref6; 0 <= _ref6 ? fi++ : fi--) {
+          renderIcon(fi);
+        }
+        lines = ((_ref7 = note.text) != null ? _ref7 : '').split('\n');
         _results = [];
-        for (i = 0, _ref6 = lines.length; 0 <= _ref6 ? i < _ref6 : i > _ref6; 0 <= _ref6 ? i++ : i--) {
+        for (i = 0, _ref8 = lines.length; 0 <= _ref8 ? i < _ref8 : i > _ref8; 0 <= _ref8 ? i++ : i--) {
           line = lines[i];
           if (!line) {
             if (i < lines.length - 1) {

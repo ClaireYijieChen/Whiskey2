@@ -132,14 +132,15 @@ class HTML5CacheProvider extends CacheProvider
     # log 'Saving file', name, path
     if not @cacheDir then return handler 'No filesystem'
     openForRead = (file) =>
-      reader = new FileReader()
-      reader.onloadend = (e) =>
-        # log 'Read done', e
-        openForWrite name, reader.result
-      reader.onerror = (err) =>
-        log 'Error reading', err
-        handler 'Read error'
-      reader.readAsArrayBuffer file
+      openForWrite name, file
+      # reader = new FileReader()
+      # reader.onloadend = (e) =>
+        # # log 'Read done', e
+        # openForWrite name, reader.result
+      # reader.onerror = (err) =>
+        # log 'Error reading', err
+        # handler 'Read error'
+      # reader.readAsArrayBuffer file
     readWrite = (data, file) =>
       file.createWriter (writer) =>
         writer.onwriteend = () =>
@@ -147,9 +148,7 @@ class HTML5CacheProvider extends CacheProvider
         writer.onerror = (err) =>
           log 'Write failed', err
           handler 'Write error'
-        bb = new WebKitBlobBuilder()
-        bb.append data
-        writer.write bb.getBlob()
+        writer.write data
       , (err) =>
         log 'Write failed', err
         handler 'Write error'
@@ -216,7 +215,7 @@ class HTML5CacheProvider extends CacheProvider
     if not @cacheDir then return handler 'No filesystem'
     getFileContents = (name) =>
       @cacheDir.getFile name, {create: false}, (file) =>
-        # log 'File found:', file
+        log 'File found:', name, file
         file.file (file) =>
           doUpload file, "/rest/file/upload?name=#{name}&"
         , (err) =>

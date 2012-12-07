@@ -194,20 +194,10 @@
         _this = this;
       if (!this.cacheDir) return handler('No filesystem');
       openForRead = function(file) {
-        var reader;
-        reader = new FileReader();
-        reader.onloadend = function(e) {
-          return openForWrite(name, reader.result);
-        };
-        reader.onerror = function(err) {
-          log('Error reading', err);
-          return handler('Read error');
-        };
-        return reader.readAsArrayBuffer(file);
+        return openForWrite(name, file);
       };
       readWrite = function(data, file) {
         return file.createWriter(function(writer) {
-          var bb;
           writer.onwriteend = function() {
             return handler(null, file.toURL());
           };
@@ -215,9 +205,7 @@
             log('Write failed', err);
             return handler('Write error');
           };
-          bb = new WebKitBlobBuilder();
-          bb.append(data);
-          return writer.write(bb.getBlob());
+          return writer.write(data);
         }, function(err) {
           log('Write failed', err);
           return handler('Write error');
@@ -308,6 +296,7 @@
         return _this.cacheDir.getFile(name, {
           create: false
         }, function(file) {
+          log('File found:', name, file);
           return file.file(function(file) {
             return doUpload(file, "/rest/file/upload?name=" + name + "&");
           }, function(err) {

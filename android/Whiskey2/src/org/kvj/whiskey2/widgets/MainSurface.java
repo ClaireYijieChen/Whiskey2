@@ -1,5 +1,8 @@
 package org.kvj.whiskey2.widgets;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.util.List;
 
 import org.kvj.bravo7.SuperActivity;
@@ -15,6 +18,8 @@ import org.kvj.whiskey2.widgets.v11.NoteDnDDecorator;
 import org.kvj.whiskey2.widgets.v11.PageDnDDecorator;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.os.AsyncTask;
 import android.support.v4.app.DialogFragment;
 import android.support.v4.app.FragmentActivity;
@@ -26,6 +31,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
@@ -196,7 +202,7 @@ public class MainSurface extends RelativeLayout {
 			}
 		});
 		for (NoteInfo info : page.notes) { // Create textview's
-			TextView view = createNoteTextItem(page, info);
+			View view = createNoteTextItem(page, info);
 			info.widget = view;
 			decorateNoteView(view, info);
 		}
@@ -243,7 +249,7 @@ public class MainSurface extends RelativeLayout {
 		}
 	}
 
-	private void decorateNoteView(TextView view, NoteInfo info) {
+	private void decorateNoteView(View view, NoteInfo info) {
 		if (android.os.Build.VERSION.SDK_INT >= 11) {
 			NoteDnDDecorator.decorate(adapter.getController(), view, info);
 		}
@@ -324,9 +330,36 @@ public class MainSurface extends RelativeLayout {
 		adapter.getController().notifyNoteChanged(null);
 	}
 
-	protected TextView createNoteTextItem(final PageSurface page, final NoteInfo info) {
-		final TextView textView = new TextView(getContext());
-		textView.setId((int) info.id);
+	private Bitmap decodeFile(File f, int width) {
+		try {
+			// Decode image size
+			BitmapFactory.Options o = new BitmapFactory.Options();
+			o.inJustDecodeBounds = true;
+			o.inPurgeable = true;
+			BitmapFactory.decodeStream(new FileInputStream(f), null, o);
+
+			// The new size we want to scale to
+			// Find the correct scale value. It should be the power of 2.
+			if (o.outWidth <= 0 || width <= 0) { // Invalid width
+				return null;
+			}
+			int scale = 1;
+			while (o.outWidth / scale / 2 >= width) {
+				scale *= 2;
+			}
+			// Decode with inSampleSize
+			BitmapFactory.Options o2 = new BitmapFactory.Options();
+			o2.inSampleSize = scale;
+			return BitmapFactory.decodeStream(new FileInputStream(f), null, o2);
+		} catch (FileNotFoundException e) {
+		}
+		return null;
+	}
+
+	protected View createNoteTextItem(final PageSurface page, final NoteInfo info) {
+		final LinearLayout root = (LinearLayout) inflater.inflate(R.layout.one_note, this, false);
+		final TextView text = (TextView) root.findViewById(R.id.one_note_text);
+		root.setId((int) info.id);
 		int width = (int) (info.width / page.zoomFactor);
 		int height = RelativeLayout.LayoutParams.WRAP_CONTENT;
 		if (info.collapsible) { // Collapsible - collapse
@@ -337,23 +370,23 @@ public class MainSurface extends RelativeLayout {
 		params.addRule(RelativeLayout.ALIGN_PARENT_LEFT);
 		params.leftMargin = (int) (info.x / page.zoomFactor + page.marginLeft);
 		params.topMargin = (int) (info.y / page.zoomFactor + page.marginTop);
-		textView.setBackgroundResource(adapter.getController().getBackgroundDrawable(info.color));
+		root.setBackgroundResource(adapter.getController().getBackgroundDrawable(info.color));
 		int textPadding = (int) (TEXT_PADDING / page.zoomFactor);
-		textView.setPadding(textPadding, textPadding, textPadding, textPadding);
-		textView.setTextSize(TypedValue.COMPLEX_UNIT_PX, TEXT_SIZE / page.zoomFactor);
-		textView.setFocusable(true);
-		textView.setFocusableInTouchMode(true);
-		SpannableStringBuilder text = new SpannableStringBuilder(info.text);
-		textView.setText(text);
-		addView(textView, params);
-		textView.setOnClickListener(new OnClickListener() {
+		root.setPadding(textPadding, textPadding, textPadding, textPadding);
+		text.setTextSize(TypedValue.COMPLEX_UNIT_PX, TEXT_SIZE / page.zoomFactor);
+		root.setFocusable(true);
+		root.setFocusableInTouchMode(true);
+		SpannableStringBuilder _text = new SpannableStringBuilder(info.text);
+		text.setText(_text);
+		addView(root, params);
+		root.setOnClickListener(new OnClickListener() {
 
 			@Override
 			public void onClick(View v) {
-				textView.requestFocus();
+				root.requestFocus();
 			}
 		});
-		textView.setOnFocusChangeListener(new OnFocusChangeListener() {
+		root.setOnFocusChangeListener(new OnFocusChangeListener() {
 
 			@Override
 			public void onFocusChange(View v, boolean hasFocus) {
@@ -362,27 +395,27 @@ public class MainSurface extends RelativeLayout {
 					info.linksToolbar.setVisibility(hasFocus ? View.VISIBLE : View.GONE);
 				}
 				if (hasFocus) { // Bring to front first
-					textView.bringToFront();
-					toolbarParams.addRule(RelativeLayout.ALIGN_TOP, textView.getId());
-					toolbarParams.addRule(RelativeLayout.RIGHT_OF, textView.getId());
+					root.bringToFront();
+					toolbarParams.addRule(RelativeLayout.ALIGN_TOP, root.getId());
+					toolbarParams.addRule(RelativeLayout.RIGHT_OF, root.getId());
 					toolbar.setVisibility(VISIBLE);
 					toolbar.bringToFront();
 					toolbar.setLayoutParams(toolbarParams);
 					currentNote = info;
 				}
 				if (info.collapsible) { // Change state
-					RelativeLayout.LayoutParams params = (LayoutParams) textView.getLayoutParams();
+					RelativeLayout.LayoutParams params = (LayoutParams) root.getLayoutParams();
 					if (hasFocus) { // Expand
 						params.height = RelativeLayout.LayoutParams.WRAP_CONTENT;
 					} else {
 						params.height = (int) (COLLPASED_HEIGHT / page.zoomFactor);
 					}
 					info.collapsed = !info.collapsed;
-					textView.requestLayout();
+					root.requestLayout();
 				}
 			}
 		});
-		return textView;
+		return root;
 	}
 
 	private void startEditor(NoteInfo info) {
