@@ -67,6 +67,7 @@ public class PageSurface extends View {
 		super(context);
 		inflater = (LayoutInflater) getContext().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
 		paint.setAntiAlias(true);
+		linkPaint.setAntiAlias(true);
 		density = getContext().getResources().getDisplayMetrics().density;
 		setFocusable(true);
 		setFocusableInTouchMode(true);

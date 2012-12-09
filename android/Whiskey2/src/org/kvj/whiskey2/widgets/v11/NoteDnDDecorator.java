@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.kvj.whiskey2.data.DataController;
 import org.kvj.whiskey2.data.NoteInfo;
+import org.kvj.whiskey2.widgets.PageSurface;
 
 import android.annotation.TargetApi;
 import android.content.ClipData;
@@ -28,7 +29,8 @@ public class NoteDnDDecorator {
 	static final String MIME_NOTE = "custom/note";
 	protected static final String TAG = "NoteDnD";
 
-	public static void decorate(final DataController controller, final View view, final NoteInfo note) {
+	public static void decorate(final DataController controller, final View view, final NoteInfo note,
+			final PageSurface surface) {
 		view.setOnLongClickListener(new OnLongClickListener() {
 
 			@Override
@@ -63,6 +65,8 @@ public class NoteDnDDecorator {
 						if (dndInfo.notes.size() == 1 && controller.createLink(dndInfo.notes.get(0), note)) {
 							controller.notifyNoteChanged(note);
 							return true;
+						} else {
+							surface.onDragEvent(event);
 						}
 					}
 					break;

@@ -368,6 +368,11 @@ public class DataController {
 		try { // Remote and JSON errors
 			PJSONObject obj = info.toPJSON();
 			svc.removeCascade("notes", obj);
+			if (null != info.files) {
+				for (int i = 0; i < info.files.length(); i++) {
+					svc.removeFile(info.files.optString(i, ""));
+				}
+			}
 			return true;
 		} catch (Exception e) {
 			Log.e(TAG, "Error removing note:", e);
@@ -510,6 +515,34 @@ public class DataController {
 			return true;
 		} catch (Exception e) {
 			Log.e(TAG, "Error creating link:", e);
+		}
+		return false;
+	}
+
+	public String getFile(String file) {
+		SyncService svc = getRemote();
+		if (null == svc) { // No connection
+			Log.w(TAG, "No service");
+			return null;
+		}
+		try {
+			return svc.getFile(file);
+		} catch (RemoteException e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+
+	public boolean removeFile(String file) {
+		SyncService svc = getRemote();
+		if (null == svc) { // No connection
+			Log.w(TAG, "No service");
+			return false;
+		}
+		try {
+			return svc.removeFile(file);
+		} catch (RemoteException e) {
+			e.printStackTrace();
 		}
 		return false;
 	}

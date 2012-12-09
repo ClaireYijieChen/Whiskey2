@@ -2,21 +2,59 @@
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
-    <ScrollView
+    <org.kvj.whiskey2.widgets.LockableHorizontalScrollView
+        android:id="@+id/notepad_hor_scroll"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:fillViewport="true">
-        <org.kvj.whiskey2.widgets.MainSurface
-            android:id="@+id/notepad_main_surface"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content">
-        </org.kvj.whiskey2.widgets.MainSurface>
-    </ScrollView>
-    <ZoomControls
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true">
+            <org.kvj.whiskey2.widgets.MainSurface
+                android:id="@+id/notepad_main_surface"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content">
+            </org.kvj.whiskey2.widgets.MainSurface>
+        </ScrollView>
+    </org.kvj.whiskey2.widgets.LockableHorizontalScrollView>
+    <LinearLayout
         android:id="@+id/notepad_main_zoom"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_height="40dp"
         android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true"
-        android:layout_marginBottom="10dp"/>
+        android:layout_marginBottom="10dp"
+        android:background="@color/float_toolbar_bg">
+        <ImageButton
+            android:id="@+id/notepad_main_zoom_in"
+            android:layout_width="40dp"
+            android:layout_height="match_parent"
+            android:layout_margin="0dp"
+            android:background="@drawable/float_button_bg"
+            android:padding="4dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/zoom_in"/>
+        <ImageButton
+            android:id="@+id/notepad_main_zoom_out"
+            android:layout_width="40dp"
+            android:layout_height="match_parent"
+            android:layout_margin="0dp"
+            android:background="@drawable/float_button_bg"
+            android:padding="4dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/zoom_out"/>
+        <ToggleButton
+            android:id="@+id/notepad_main_zoom_lock"
+            android:layout_width="40dp"
+            android:layout_height="match_parent"
+            android:layout_margin="0dp"
+            android:background="@drawable/float_button_bg"
+            android:padding="4dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/zoom_lock"
+            android:textColor="#ffffff"
+            android:textOff="OFF"
+            android:textOn="ON"/>
+    </LinearLayout>
 </RelativeLayout>

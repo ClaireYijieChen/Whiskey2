@@ -33,6 +33,7 @@ public class DrawTemplate {
 		linePaint.setStyle(Style.STROKE);
 		textPaint.setStyle(Style.FILL);
 		textPaint.setStrokeWidth(density * FONT_WIDTH);
+		textPaint.setAntiAlias(true);
 	}
 
 	public void render(TemplateInfo tmpl, SheetInfo sheet, Canvas canvas, PageSurface page) throws JSONException {

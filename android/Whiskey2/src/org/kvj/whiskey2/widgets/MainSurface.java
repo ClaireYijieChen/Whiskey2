@@ -5,6 +5,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.util.List;
 
+import org.json.JSONArray;
 import org.kvj.bravo7.SuperActivity;
 import org.kvj.whiskey2.R;
 import org.kvj.whiskey2.data.BookmarkInfo;
@@ -17,9 +18,12 @@ import org.kvj.whiskey2.widgets.v11.BookmarkDnDDecorator;
 import org.kvj.whiskey2.widgets.v11.NoteDnDDecorator;
 import org.kvj.whiskey2.widgets.v11.PageDnDDecorator;
 
+import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Point;
 import android.os.AsyncTask;
 import android.support.v4.app.DialogFragment;
 import android.support.v4.app.FragmentActivity;
@@ -27,10 +31,12 @@ import android.text.SpannableStringBuilder;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
@@ -50,6 +56,10 @@ public class MainSurface extends RelativeLayout {
 	private static final float COLLPASED_HEIGHT = (float) 8.5;
 	private static final float BOOKMARK_WIDTH = 6;
 	private static final float BOOKMARK_GAP = 2;
+	private static final int ICON_SIZE = 12;
+	private static final int IMAGE_MARGIN = 6;
+	private static final float ICON_MARGIN = 1;
+	private static final float FILE_TEXT_SIZE = 4;
 
 	private boolean layoutCreated = false;
 	private float density = 1;
@@ -204,7 +214,7 @@ public class MainSurface extends RelativeLayout {
 		for (NoteInfo info : page.notes) { // Create textview's
 			View view = createNoteTextItem(page, info);
 			info.widget = view;
-			decorateNoteView(view, info);
+			decorateNoteView(view, info, page);
 		}
 		List<BookmarkInfo> bmarks = adapter.getController().getBookmarks(sheet.id);
 		if (null != bmarks) { // Have bookmarks -> create
@@ -249,9 +259,9 @@ public class MainSurface extends RelativeLayout {
 		}
 	}
 
-	private void decorateNoteView(View view, NoteInfo info) {
+	private void decorateNoteView(View view, NoteInfo info, PageSurface surface) {
 		if (android.os.Build.VERSION.SDK_INT >= 11) {
-			NoteDnDDecorator.decorate(adapter.getController(), view, info);
+			NoteDnDDecorator.decorate(adapter.getController(), view, info, surface);
 		}
 	}
 
@@ -356,6 +366,140 @@ public class MainSurface extends RelativeLayout {
 		return null;
 	}
 
+	private Point getBitmapSize(File f) {
+		try {
+			// Decode image size
+			BitmapFactory.Options o = new BitmapFactory.Options();
+			o.inJustDecodeBounds = true;
+			o.inPurgeable = true;
+			BitmapFactory.decodeStream(new FileInputStream(f), null, o);
+			return new Point(o.outWidth, o.outHeight);
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+
+	private void createFiles(final PageSurface page, final NoteInfo info, final boolean expanded, ViewGroup root) {
+		if (null == info.files || 0 == info.files.length()) {
+			return;
+		}
+		final int margin = (int) (ICON_MARGIN / page.zoomFactor);
+		LinearLayout panel = (LinearLayout) root.findViewById(R.id.one_note_files);
+		panel.removeAllViews();
+		panel.setOrientation(expanded ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
+		for (int i = 0; i < info.files.length(); i++) {
+			final String file = info.files.optString(i, "");
+			final int index = i;
+			View child = null;
+			if (file.endsWith(".jpg")) {
+				final int width = expanded ? info.width - IMAGE_MARGIN : ICON_SIZE;
+				int w = (int) (width / page.zoomFactor);
+				LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(w, w);
+				params.rightMargin = margin;
+				final ImageView view = (ImageView) inflater.inflate(R.layout.one_note_image, panel, false);
+				child = view;
+				AsyncTask<Void, Void, String> task = new AsyncTask<Void, Void, String>() {
+
+					@Override
+					protected String doInBackground(Void... params) {
+						return adapter.getController().getFile(file);
+					}
+
+					@Override
+					protected void onPostExecute(String result) {
+						if (null == result) {
+							return;
+						}
+						File f = new File(result);
+						Point size = getBitmapSize(f);
+						if (null == size) {
+							return;
+						}
+						float mul = (expanded ? size.x : Math.max(size.x, size.y)) / width;
+						Bitmap b = decodeFile(f, (int) (width / page.zoomFactor));
+						if (null == b) {
+							return;
+						}
+						int w = (int) (size.x / mul / page.zoomFactor);
+						int h = (int) (size.y / mul / page.zoomFactor);
+						LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(w, h);
+						if (expanded) {
+							params.bottomMargin = margin;
+							params.gravity = Gravity.CENTER_HORIZONTAL;
+						} else {
+							params.rightMargin = margin;
+							params.gravity = Gravity.LEFT;
+						}
+						view.setLayoutParams(params);
+						view.setImageBitmap(b);
+					}
+				};
+				panel.addView(view, params);
+				task.execute();
+			} else {
+				final int width = ICON_SIZE;
+				int w = (int) (width / page.zoomFactor);
+				LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(w, w);
+				params.rightMargin = margin;
+				TextView textView = (TextView) inflater.inflate(R.layout.one_note_file, panel, false);
+				child = textView;
+				String ext = "???";
+				if (-1 != file.lastIndexOf('.')) {
+					ext = file.substring(file.lastIndexOf('.'));
+				}
+				textView.setTextSize(TypedValue.COMPLEX_UNIT_PX, FILE_TEXT_SIZE / page.zoomFactor);
+				textView.setText(ext);
+				panel.addView(textView, params);
+			}
+			child.setOnLongClickListener(new OnLongClickListener() {
+
+				@Override
+				public boolean onLongClick(View v) {
+					new AlertDialog.Builder(getContext()).setIcon(android.R.drawable.ic_dialog_alert)
+							.setTitle("Action")
+							.setMessage("What to do with file No  " + index + "?")
+							.setPositiveButton("Open", new DialogInterface.OnClickListener() {
+
+								@Override
+								public void onClick(DialogInterface dialog, int which) {
+								}
+							}).setNeutralButton("Remove", new DialogInterface.OnClickListener() {
+
+								@Override
+								public void onClick(DialogInterface dialog, int which) {
+									NoteInfo current = adapter.getController().getNote(info.id);
+									if (null == current || null == current.files) {
+										SuperActivity.notifyUser(getContext(), "Invalid note");
+										return;
+									}
+									JSONArray arr = new JSONArray();
+									for (int j = 0; j < current.files.length(); j++) {
+										if (!current.files.optString(j, "").equals(file)) {
+											arr.put(current.files.optString(j, ""));
+										}
+									}
+									current.files = arr;
+									if (adapter.getController().saveNote(current)) {
+										adapter.getController().removeFile(file);
+										adapter.getController().notifyNoteChanged(current);
+									} else {
+										SuperActivity.notifyUser(getContext(), "Save failed");
+										return;
+									}
+								}
+							}).setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+
+								@Override
+								public void onClick(DialogInterface dialog, int which) {
+								}
+							}).show();
+					return true;
+				}
+			});
+		}
+	}
+
 	protected View createNoteTextItem(final PageSurface page, final NoteInfo info) {
 		final LinearLayout root = (LinearLayout) inflater.inflate(R.layout.one_note, this, false);
 		final TextView text = (TextView) root.findViewById(R.id.one_note_text);
@@ -391,6 +535,7 @@ public class MainSurface extends RelativeLayout {
 			@Override
 			public void onFocusChange(View v, boolean hasFocus) {
 				// Log.i(TAG, "Focus changed: " + info.id + ", " + hasFocus);
+				createFiles(page, info, hasFocus, root);
 				if (null != info.linksToolbar) { // Have links toolbar
 					info.linksToolbar.setVisibility(hasFocus ? View.VISIBLE : View.GONE);
 				}
@@ -415,6 +560,7 @@ public class MainSurface extends RelativeLayout {
 				}
 			}
 		});
+		createFiles(page, info, false, root);
 		return root;
 	}
 
