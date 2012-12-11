@@ -11,8 +11,8 @@ public class TemplateInfo {
 	public String type;
 	public String name;
 	public JSONObject config;
-	public int width = 100;
-	public int height = 141;
+	public int width = 102;
+	public int height = 144;
 	PJSONObject original = null;
 
 	public static TemplateInfo fromJSON(PJSONObject obj) throws JSONException {

@@ -37,7 +37,15 @@ public class DrawTemplate {
 	}
 
 	public void render(TemplateInfo tmpl, SheetInfo sheet, Canvas canvas, PageSurface page) throws JSONException {
-		JSONArray arr = tmpl.config.optJSONArray("draw");
+
+		JSONArray arr = null;
+		if (null != sheet.config) { // Have config
+			arr = sheet.config.optJSONArray("draw");
+		}
+		if (null == arr && null != tmpl.config) {
+			// No draw inside sheet - use template
+			arr = tmpl.config.optJSONArray("draw");
+		}
 		if (null != arr) { // Have data to draw
 			draw(arr, canvas, page.getZoomFactor());
 		}

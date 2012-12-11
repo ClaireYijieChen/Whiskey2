@@ -96,6 +96,7 @@
   overflow: visible;
   position: relative;
   vertical-align: middle;
+  box-sizing: border-box;
 }
 
 .sheet_content {

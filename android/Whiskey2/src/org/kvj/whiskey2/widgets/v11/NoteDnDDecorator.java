@@ -13,17 +13,15 @@ import android.content.ClipData.Item;
 import android.content.Intent;
 import android.os.Build;
 import android.text.SpannableString;
-import android.view.DragEvent;
 import android.view.View;
-import android.view.View.OnDragListener;
 import android.view.View.OnLongClickListener;
 
 @TargetApi(Build.VERSION_CODES.HONEYCOMB)
 public class NoteDnDDecorator {
 
 	public static class NoteDnDInfo {
-		List<NoteInfo> notes = new ArrayList<NoteInfo>();
-		int leftFix, topFix;
+		public List<NoteInfo> notes = new ArrayList<NoteInfo>();
+		public int leftFix, topFix;
 	}
 
 	static final String MIME_NOTE = "custom/note";
@@ -44,34 +42,6 @@ public class NoteDnDDecorator {
 				dndinfo.topFix = view.getHeight() / 2;
 				view.startDrag(data, shadow, dndinfo, 0);
 				return true;
-			}
-		});
-		view.setOnDragListener(new OnDragListener() {
-
-			@SuppressWarnings("unchecked")
-			@Override
-			public boolean onDrag(View v, DragEvent event) {
-				switch (event.getAction()) {
-				case DragEvent.ACTION_DRAG_LOCATION:
-				case DragEvent.ACTION_DRAG_ENTERED:
-				case DragEvent.ACTION_DRAG_STARTED:
-					if (event.getClipDescription().hasMimeType(NoteDnDDecorator.MIME_NOTE)) {
-						return true;
-					}
-					break;
-				case DragEvent.ACTION_DROP:
-					if (event.getClipDescription().hasMimeType(NoteDnDDecorator.MIME_NOTE)) {
-						NoteDnDInfo dndInfo = (NoteDnDInfo) event.getLocalState();
-						if (dndInfo.notes.size() == 1 && controller.createLink(dndInfo.notes.get(0), note)) {
-							controller.notifyNoteChanged(note);
-							return true;
-						} else {
-							surface.onDragEvent(event);
-						}
-					}
-					break;
-				}
-				return false;
 			}
 		});
 

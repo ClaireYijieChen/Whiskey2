@@ -53,14 +53,14 @@ public class PagerItemFragment extends SherlockFragment implements OnPageZoomLis
 		this.notepadID = notepadID;
 		this.index = index;
 		this.adapter = adapter;
+		if (null != adapter) { // Attach
+			adapter.setFragmentActive(this, true);
+		}
 	}
 
 	@Override
 	public void onAttach(Activity activity) {
 		super.onAttach(activity);
-		if (null != adapter) { // Attach
-			adapter.setFragmentActive(this, true);
-		}
 	}
 
 	@Override

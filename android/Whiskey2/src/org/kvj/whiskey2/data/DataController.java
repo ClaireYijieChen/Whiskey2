@@ -40,16 +40,16 @@ public class DataController {
 	final Object connectorLock = new Object();
 	private Integer[] colors = { R.drawable.note0, R.drawable.note1, R.drawable.note2, R.drawable.note3,
 			R.drawable.note4, R.drawable.note5, R.drawable.note6, R.drawable.note7 };
-	public static Integer[] widths = { 50, 75, 90, 125 };
+	public static Integer[] widths = { 50, 75, 90, 120, 150 };
 	private int gridStep = 6;
 	List<DataControllerListener> listeners = new ArrayList<DataController.DataControllerListener>();
 	Map<Long, List<BookmarkInfo>> bookmarks = new HashMap<Long, List<BookmarkInfo>>();
 	Map<Long, TemplateInfo> templates = new HashMap<Long, TemplateInfo>();
-	Map<String, DrawTemplate> templateConfigs = new HashMap<String, DrawTemplate>();
+	DrawTemplate drawTemplate = null;
 
 	public DataController(Whiskey2App whiskey2App) {
 		this.app = whiskey2App;
-		templateConfigs.put("draw", new DrawTemplate(this));
+		drawTemplate = new DrawTemplate(this);
 		startConnector();
 	}
 
@@ -434,11 +434,6 @@ public class DataController {
 		return false;
 	}
 
-	public DrawTemplate getTemplateConfig(TemplateInfo info) {
-		DrawTemplate tmplConfig = templateConfigs.get(info.type);
-		return tmplConfig;
-	}
-
 	public boolean createLink(NoteInfo note, NoteInfo other) {
 		SyncService svc = getRemote();
 		if (null == svc) { // No connection
@@ -545,5 +540,9 @@ public class DataController {
 			e.printStackTrace();
 		}
 		return false;
+	}
+
+	public DrawTemplate getDrawTemplate() {
+		return drawTemplate;
 	}
 }

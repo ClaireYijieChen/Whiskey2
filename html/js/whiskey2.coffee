@@ -27,7 +27,8 @@ class Whiskey2
       @sync()
     @oauth.token = @manager.get('token', 'no-value')
     @templateConfigs = {}
-    @templateConfigs.draw = new DrawTemplate this
+    @templateDrawer = new DrawTemplate this
+    @templateConfigs.week = new WeekTemplateConfig this
     @manager.open (error) =>
       if error
         @manager = null
@@ -226,8 +227,8 @@ class Whiskey2
     return div
 
   emptyTemplate: {
-    width: 100
-    height: 141
+    width: 102
+    height: 144
     name: 'No template'
   }
   getTemplate: (id) ->
@@ -332,6 +333,19 @@ class Whiskey2
     for id in ids
       @manager.findOne stream, id, ag.fn
 
+  sortTemplates: (arr) ->
+    result = []
+    tag = null
+    section = null
+    for item in arr
+      if item.tag isnt tag
+        # Tag changed
+        section = title: (if item.tag then item.tag else 'No tag'), items: []
+        tag = item.tag
+        result.push section
+      section.items.push item
+    return result
+
 class Notepad
 
   zoom: 1
@@ -388,6 +402,7 @@ class Notepad
       @app.manager.save 'bookmarks', bmark, _handler
 
   showSheetDialog: (sheet, handler) ->
+    noTemplateText = 'No template'
     $('#sheet-dialog').modal('show')
     templateID = sheet.template_id ? null
     $('#sheet-dialog-name').val(sheet.title ? '').focus().select()
@@ -415,27 +430,33 @@ class Notepad
         @app.manager.storage.update 'sheets', sheet, _handler
       return no
     templateButtonText = $('#sheet-dialog-template-title')
-    templateButtonText.text('No template')
+    templateButtonText.text(noTemplateText)
     ul = $('#sheet-dialog-template-menu').empty()
     @app.manager.storage.select 'templates', [], (err, data) =>
       if err then return
+      data = @app.sortTemplates data
       ul.empty()
       li = $(document.createElement('li')).appendTo(ul)
       a = $(document.createElement('a')).appendTo(li)
-      a.text 'No template'
+      a.text noTemplateText
       a.bind 'click', (e) =>
         templateID = null
-        templateButtonText.text('No template')
-      for item in data
-        li = $(document.createElement('li')).appendTo(ul)
+        templateButtonText.text(noTemplateText)
+      for section in data
+        li = $(document.createElement('li')).addClass('dropdown-submenu').appendTo(ul)
         a = $(document.createElement('a')).appendTo(li)
-        a.text item.name
-        do (a, item) =>
-          a.bind 'click', (e) =>
-            templateID = item.id
+        a.text section.title
+        ul2 = $(document.createElement('ul')).addClass('dropdown-menu').appendTo(li)
+        for item in section.items
+          li = $(document.createElement('li')).appendTo(ul2)
+          a = $(document.createElement('a')).appendTo(li)
+          a.text item.name
+          do (a, item) =>
+            a.bind 'click', (e) =>
+              templateID = item.id
+              templateButtonText.text(item.name)
+          if templateID is item.id
             templateButtonText.text(item.name)
-        if templateID is item.id
-          templateButtonText.text(item.name)
     , {order: ['tag', 'name']}
 
   removeSheets: (ids) ->
@@ -613,8 +634,9 @@ class Notepad
       count++
 
   showNotesDialog: (sheet, note, handler) ->
-    $('#note-dialog').modal('show')
-    $('#note-dialog-text').val(note.text ? '').focus()
+    $('#note-dialog').modal backdrop: 'static', keyboard: no
+    currentText = note.text ? ''
+    $('#note-dialog-text').val(currentText).focus()
     $('#note-dialog-collapsed').attr 'checked': if note.collapsed then yes else no
     colors = $('#note-dialog-colors').empty()
     widths = $('#note-dialog-widths').empty()
@@ -633,6 +655,14 @@ class Notepad
       if currentWidth is width
         a.addClass 'active'
     widths.button()
+    $('#do-close-note-dialog').unbind('click').bind 'click', (e) =>
+      text = $('#note-dialog-text').val().trim()
+      if text isnt currentText
+        @app.showPrompt 'There is unsaved text. Are you sure want to close dialog?', =>
+          $('#note-dialog').modal('hide')
+      else
+        $('#note-dialog').modal('hide')
+
     $('#do-remove-note-dialog').unbind('click').bind 'click', (e) =>
       if not note.id then return
       @app.showPrompt 'Are you sure want to remove note?', () =>
@@ -765,7 +795,6 @@ class Notepad
               return no
 
     loadNote = (note) =>
-      # log 'loadNote', note
       div = $(document.createElement('div')).addClass('note').appendTo(parent)
       div.attr draggable: yes, id: 'note'+note.id
       div.bind 'click', (e) =>
@@ -827,7 +856,7 @@ class Notepad
       renderIcon = (fi) =>
         ICON_SIZE = 12
         file = files[fi]
-        log 'renderIcon', file, fi
+        # log 'renderIcon', file, fi
         attDiv = $(document.createElement('div')).addClass('note-file').appendTo(div)
         iconsize = @preciseEm ICON_SIZE
         iconsizeexpanded = notewidth-8
@@ -898,13 +927,19 @@ class Notepad
         bmarkx += bmarkstep
     @app.manager.storage.select 'notes', ['sheet_id', sheet.id], (err, arr) =>
       if err then return @app.showError err
+      arr = arr.sort (a, b) ->
+        if a.y < b.y then return -1
+        if a.y > b.y then return 1
+        if a.x < b.x then return -1
+        if a.x > b.x then return 1
+        return 0
       parent.children('div').remove()
       for item in arr
         loadNote item
         @notes.push item
       renderLinks(arr)
       renderBookmarks(parent)
-  noteWidths: [50, 75, 90, 125]
+  noteWidths: [50, 75, 90, 120, 150]
   noteDefaultWidth: 1
   zoomFactor: 5
   colors: 8
@@ -949,8 +984,8 @@ class Notepad
     divContent = div.find('.sheet_content')
     canvas = canto(div.find('.sheet-canvas').get(0))
     canvas.reset()
-    width = Math.floor(template.width/@zoomFactor)
-    height = Math.floor(template.height/@zoomFactor)
+    width = @preciseEm template.width
+    height = @preciseEm template.height
     divContent.css width: "#{width}em", height: "#{height}em"
     divTitle = div.find('.sheet_title')
     divTitle.text(sheet.title ? 'Untitled')
@@ -960,6 +995,12 @@ class Notepad
     div.find('.sheet-toolbar-add-bmark').unbind('click').bind 'click', ()=>
       @showBMarkDialog {sheet_id: sheet.id}, =>
         @reloadSheetsBookmarks()
+    configButton = div.find('.sheet-toolbar-config')
+    if templateConfig
+      configButton.removeClass('disabled').unbind('click').bind 'click', ()=>
+        templateConfig.configure template, sheet, this
+    else
+      configButton.addClass('disabled')
     divContent.unbind()
     divContent.bind 'mousedown', (e) =>
       offset = @app.dragGetOffset e, divContent
@@ -1040,14 +1081,21 @@ class Notepad
           @app.manager.batch config, (err, arr) =>
             if err then return @app.showError err
             updates = []
+            moveX = 0
+            moveY = 0
             arr = arr.sort (a, b) ->
               if a.y<b.y then return -1
               if a.y>b.y then return 1
               return a.x-b.x
-            for note in arr
+            for index in [0...arr.length]
+              note = arr[index]
+              if index is 0
+                # Calc move
+                moveX = note.x-x
+                moveY = note.y-y
               note.sheet_id = sheet.id
-              note.x = x
-              note.y = y
+              note.x -= moveX
+              note.y -= moveY
               y+= @gridStep*2
               updates.push type: 'update', stream: 'notes', object: note
             @app.manager.batch updates, (err) =>
@@ -1058,8 +1106,8 @@ class Notepad
     canvas.width = divContent.width()
     canvas.height = divContent.height()
     zoom = divContent.width()/template.width
-    if templateConfig
-      templateConfig.render template, sheet, canvas, zoom
+    #if templateConfig
+    @app.templateDrawer.render template, sheet, canvas, zoom
     @loadNotes sheet, divContent, canvas, zoom
     return div
 
@@ -1139,7 +1187,7 @@ class TemplateManager
       @edit @selected
       @app.refreshTemplates()
 
-  edit: (template = {width: 100, height: 141}) ->
+  edit: (template = {width: 102, height: 144}) ->
     @enableForm()
     log 'edit', template
     $('.template-save').attr disabled: null
@@ -1164,29 +1212,132 @@ class TemplateManager
       if err then return @app.showError err
       ul.empty()
       found = no
-      for item in data
-        li = $(document.createElement('li'))
-        if @selected?.id is item.id
-          found = yes
-          li.addClass('active')
-        a = $(document.createElement('a')).attr 'href': '#'
-        a.text(item.name)
-        a.appendTo li
+      data = @app.sortTemplates data
+      for section in data
+        li = $(document.createElement('li')).addClass('nav-header')
+        li.text(section.title)
         li.appendTo ul
-        do (item, li) =>
-          a.bind 'click', (e) =>
-            @edit item
-            @refresh()
-            return no
+        for item in section.items
+          li = $(document.createElement('li'))
+          if @selected?.id is item.id
+            found = yes
+            li.addClass('active')
+          a = $(document.createElement('a')).attr 'href': '#'
+          a.text(item.name)
+          a.appendTo li
+          li.appendTo ul
+          do (item, li) =>
+            a.bind 'click', (e) =>
+              @edit item
+              @refresh()
+              return no
       if not found then @disableForm()
     , order: ['tag', 'name']
+
+class TemplateConfig
+
+  constructor: (@app) ->
+
+  configure: (tmpl, sheet, controller) ->
+
+class WeekTemplateConfig extends TemplateConfig
+  tmpl: """
+  <div class=\"modal hide\">
+    <div class=\"modal-header\">
+      <h3>Weekly sheet config</h3>
+    </div>
+    <div class=\"modal-body\">
+      <form class=\"form-horizontal\">
+        <div class=\"control-group\">
+          <label class=\"control-label\">Week starts from:</label>
+          <div class=\"controls\">
+            <input type=\"date\" class=\"week-dialog-date\" placeholder=\"Date\">
+          </div>
+        </div>
+        <div class=\"control-group\">
+          <label class=\"control-label\">Holidays</label>
+          <div class=\"controls week-dialog-holidays\">
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class=\"modal-footer\">
+        <a href=\"#\" class=\"btn btn-primary week-dialog-do-save\">Save</a>
+        <a href=\"#\" class=\"btn week-dialog-do-close\">Close</a>
+    </div>
+  </div>
+  """
+  dayNames: ['Êó•', 'Êúà', 'ÁÅ´', 'Ê∞¥', 'Êú®', 'Èáë', 'Âúü']
+  weekStarts: 1
+  defaultHolidays: 0: yes, 6: yes
+
+  configure: (tmpl, sheet, controller) ->
+    log 'Show template dialog'
+    div = $(@tmpl).appendTo(document.body)
+    div.modal backdrop: 'static', keyboard: no
+    div.find('.week-dialog-do-close').bind 'click', () =>
+      div.modal('hide').remove()
+    config = sheet.config ? {}
+    dateInput = div.find('.week-dialog-date')
+    if config.date
+      dateInput.val(config.date)
+    checkboxes = []
+    checkboxesDiv = div.find('.week-dialog-holidays')
+    checkboxValues = config.holidays ? @defaultHolidays
+    for index in [0...@dayNames.length]
+      day = (index+@weekStarts) % @dayNames.length
+      label = $(document.createElement('label')).addClass('checkbox inline').appendTo(checkboxesDiv)
+      label.text(@dayNames[day])
+      checkbox = $(document.createElement('input')).attr(type: 'checkbox', checked: checkboxValues[day] ? no)
+      label.prepend checkbox
+      checkboxes.push checkbox
+    div.find('.week-dialog-do-save').bind 'click', () =>
+      date = dateInput.val()
+      if not date then return @app.showError 'No date selected'
+      log 'Date', date
+      config.date = date
+      config.holidays = {}
+      for index in [0...@dayNames.length]
+        day = (index+@weekStarts) % @dayNames.length
+        if checkboxes[index].attr 'checked'
+          config.holidays[day] = yes
+      config.draw = @generate config.date, config.holidays
+      sheet.config = config
+      @app.manager.save 'sheets', sheet, (err) =>
+        if err then return @app.showError err
+        controller.reloadSheets()
+        div.modal('hide').remove()
+
+  drawStart: 11
+  drawTextY: -2
+  drawStep: 18
+  drawTextX: 85
+  drawLineX1: 65
+  drawLineX2: 98
+  drawLineColor: '#dddddd'
+  drawTextColor: '#000000'
+  drawTextHolidayColor: '#ff8888'
+
+  generate: (date, holidays) ->
+    draw = []
+    dt = new Date(date)
+    y = @drawStart
+    for index in [0...@dayNames.length]
+      day = dt.getDay()
+      draw.push type: 'line', x1: @drawLineX1, y1: y, x2: @drawLineX2, y2: y, color: @drawLineColor
+      textColor = if holidays[day] then @drawTextHolidayColor else @drawTextColor
+      dateText = if dt.getDate()<10 then '0'+dt.getDate() else ''+dt.getDate()
+      draw.push type: 'text', x: @drawTextX, y: y+@drawTextY, color: textColor, text: (@dayNames[day])+' '+dateText
+      dt.setDate(dt.getDate()+1)
+      y += @drawStep
+    return draw
 
 class DrawTemplate
 
   constructor: (@app) ->
 
   render: (tmpl, sheet, canvas, zoom) ->
-    data = tmpl.config?.draw ? []
+    data = sheet?.config?.draw ? (tmpl.config?.draw ? [])
     @draw data, canvas, zoom
 
   draw: (data, canvas, zoom) ->
@@ -1232,7 +1383,7 @@ class DrawTemplate
       "type": "text",
       "x": 90,
       "y": 9,
-      "text": "åé"
+      "text": "Êúà"
     },
     {
       "type": "line",
@@ -1246,7 +1397,7 @@ class DrawTemplate
       "type": "text",
       "x": 90,
       "y": 27,
-      "text": "âŒ"
+      "text": "ÁÅ´"
     },
     {
       "type": "line",
@@ -1260,7 +1411,7 @@ class DrawTemplate
       "type": "text",
       "x": 90,
       "y": 45,
-      "text": "êÖ"
+      "text": "Ê∞¥"
     },
     {
       "type": "line",
@@ -1274,7 +1425,7 @@ class DrawTemplate
       "type": "text",
       "x": 90,
       "y": 63,
-      "text": "ñÿ"
+      "text": "Êú®"
     },
     {
       "type": "line",
@@ -1288,7 +1439,7 @@ class DrawTemplate
       "type": "text",
       "x": 90,
       "y": 81,
-      "text": "ã‡"
+      "text": "Èáë"
     },
     {
       "type": "line",
@@ -1303,7 +1454,7 @@ class DrawTemplate
       "x": 90,
       "y": 99,
       "color": "#ff8888",
-      "text": "ìy"
+      "text": "Âúü"
     },
     {
       "type": "line",
@@ -1318,7 +1469,7 @@ class DrawTemplate
       "color": "#ff8888",
       "x": 90,
       "y": 117,
-      "text": "ì˙"
+      "text": "Êó•"
     }
   ]
 }

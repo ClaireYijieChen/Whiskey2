@@ -39,8 +39,7 @@ public class PageDnDDecorator {
 					Log.i(TAG, "Drop start on page: " + info.title);
 					if (event.getClipDescription().hasMimeType(NoteDnDDecorator.MIME_NOTE)) {
 						NoteDnDInfo dndInfo = (NoteDnDInfo) event.getLocalState();
-						main.acceptDrop(surface, info, event.getX() - dndInfo.leftFix, event.getY() - dndInfo.topFix,
-								dndInfo.notes);
+						main.acceptDrop(surface, info, event.getX(), event.getY(), dndInfo);
 						return true;
 					}
 					if (event.getClipDescription().hasMimeType(BookmarkDnDDecorator.MIME_BMARK)) {

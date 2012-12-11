@@ -42,8 +42,8 @@ public class PageSurface extends View {
 	private static final float LINK_WIDTH = 1.2f;
 	private static final float DOT_SIZE = 15;
 	private static final float DOT_GAP = 8;
-	int marginLeft = 0;
-	int marginTop = 0;
+	public int marginLeft = 0;
+	public int marginTop = 0;
 	float zoomFactor = 1;
 	Paint paint = new Paint();
 	Paint linkPaint = new Paint();

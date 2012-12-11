@@ -1,6 +1,8 @@
 (function() {
-  var DrawTemplate, Notepad, TemplateManager, Whiskey2,
-    __slice = Array.prototype.slice;
+  var DrawTemplate, Notepad, TemplateConfig, TemplateManager, WeekTemplateConfig, Whiskey2,
+    __slice = Array.prototype.slice,
+    __hasProp = Object.prototype.hasOwnProperty,
+    __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor; child.__super__ = parent.prototype; return child; };
 
   yepnope({
     load: ['lib/jquery-1.8.2.min.js', 'bs/css/bootstrap.min.css', 'bs/js/bootstrap.min.js', 'lib/custom-web/date.js', 'lib/custom-web/cross-utils.js', 'lib/common-web/underscore-min.js', 'lib/common-web/underscore.strings.js', 'css/whiskey2.css', 'lib/lima1/net.js', 'lib/lima1/main.js', 'bs/js/bootstrap-datepicker.js', 'bs/css/datepicker.css', 'lib/common-web/canto-0.15.js'],
@@ -43,7 +45,8 @@
       };
       this.oauth.token = this.manager.get('token', 'no-value');
       this.templateConfigs = {};
-      this.templateConfigs.draw = new DrawTemplate(this);
+      this.templateDrawer = new DrawTemplate(this);
+      this.templateConfigs.week = new WeekTemplateConfig(this);
       return this.manager.open(function(error) {
         if (error) {
           _this.manager = null;
@@ -370,8 +373,8 @@
     };
 
     Whiskey2.prototype.emptyTemplate = {
-      width: 100,
-      height: 141,
+      width: 102,
+      height: 144,
       name: 'No template'
     };
 
@@ -509,6 +512,26 @@
       return _results;
     };
 
+    Whiskey2.prototype.sortTemplates = function(arr) {
+      var item, result, section, tag, _i, _len;
+      result = [];
+      tag = null;
+      section = null;
+      for (_i = 0, _len = arr.length; _i < _len; _i++) {
+        item = arr[_i];
+        if (item.tag !== tag) {
+          section = {
+            title: (item.tag ? item.tag : 'No tag'),
+            items: []
+          };
+          tag = item.tag;
+          result.push(section);
+        }
+        section.items.push(item);
+      }
+      return result;
+    };
+
     return Whiskey2;
 
   })();
@@ -598,8 +621,9 @@
     };
 
     Notepad.prototype.showSheetDialog = function(sheet, handler) {
-      var templateButtonText, templateID, ul, _ref, _ref2,
+      var noTemplateText, templateButtonText, templateID, ul, _ref, _ref2,
         _this = this;
+      noTemplateText = 'No template';
       $('#sheet-dialog').modal('show');
       templateID = (_ref = sheet.template_id) != null ? _ref : null;
       $('#sheet-dialog-name').val((_ref2 = sheet.title) != null ? _ref2 : '').focus().select();
@@ -635,37 +659,52 @@
         return false;
       });
       templateButtonText = $('#sheet-dialog-template-title');
-      templateButtonText.text('No template');
+      templateButtonText.text(noTemplateText);
       ul = $('#sheet-dialog-template-menu').empty();
       return this.app.manager.storage.select('templates', [], function(err, data) {
-        var a, item, li, _fn, _i, _len, _results;
+        var a, item, li, section, ul2, _i, _len, _results;
         if (err) return;
+        data = _this.app.sortTemplates(data);
         ul.empty();
         li = $(document.createElement('li')).appendTo(ul);
         a = $(document.createElement('a')).appendTo(li);
-        a.text('No template');
+        a.text(noTemplateText);
         a.bind('click', function(e) {
           templateID = null;
-          return templateButtonText.text('No template');
+          return templateButtonText.text(noTemplateText);
         });
-        _fn = function(a, item) {
-          return a.bind('click', function(e) {
-            templateID = item.id;
-            return templateButtonText.text(item.name);
-          });
-        };
         _results = [];
         for (_i = 0, _len = data.length; _i < _len; _i++) {
-          item = data[_i];
-          li = $(document.createElement('li')).appendTo(ul);
+          section = data[_i];
+          li = $(document.createElement('li')).addClass('dropdown-submenu').appendTo(ul);
           a = $(document.createElement('a')).appendTo(li);
-          a.text(item.name);
-          _fn(a, item);
-          if (templateID === item.id) {
-            _results.push(templateButtonText.text(item.name));
-          } else {
-            _results.push(void 0);
-          }
+          a.text(section.title);
+          ul2 = $(document.createElement('ul')).addClass('dropdown-menu').appendTo(li);
+          _results.push((function() {
+            var _fn, _j, _len2, _ref3, _results2,
+              _this = this;
+            _ref3 = section.items;
+            _fn = function(a, item) {
+              return a.bind('click', function(e) {
+                templateID = item.id;
+                return templateButtonText.text(item.name);
+              });
+            };
+            _results2 = [];
+            for (_j = 0, _len2 = _ref3.length; _j < _len2; _j++) {
+              item = _ref3[_j];
+              li = $(document.createElement('li')).appendTo(ul2);
+              a = $(document.createElement('a')).appendTo(li);
+              a.text(item.name);
+              _fn(a, item);
+              if (templateID === item.id) {
+                _results2.push(templateButtonText.text(item.name));
+              } else {
+                _results2.push(void 0);
+              }
+            }
+            return _results2;
+          }).call(_this));
         }
         return _results;
       }, {
@@ -946,10 +985,14 @@
     };
 
     Notepad.prototype.showNotesDialog = function(sheet, note, handler) {
-      var a, adiv, color, colors, currentColor, currentWidth, width, widths, _i, _len, _ref, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7,
+      var a, adiv, color, colors, currentColor, currentText, currentWidth, width, widths, _i, _len, _ref, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7,
         _this = this;
-      $('#note-dialog').modal('show');
-      $('#note-dialog-text').val((_ref = note.text) != null ? _ref : '').focus();
+      $('#note-dialog').modal({
+        backdrop: 'static',
+        keyboard: false
+      });
+      currentText = (_ref = note.text) != null ? _ref : '';
+      $('#note-dialog-text').val(currentText).focus();
       $('#note-dialog-collapsed').attr({
         'checked': note.collapsed ? true : false
       });
@@ -976,6 +1019,17 @@
         if (currentWidth === width) a.addClass('active');
       }
       widths.button();
+      $('#do-close-note-dialog').unbind('click').bind('click', function(e) {
+        var text;
+        text = $('#note-dialog-text').val().trim();
+        if (text !== currentText) {
+          return _this.app.showPrompt('There is unsaved text. Are you sure want to close dialog?', function() {
+            return $('#note-dialog').modal('hide');
+          });
+        } else {
+          return $('#note-dialog').modal('hide');
+        }
+      });
       $('#do-remove-note-dialog').unbind('click').bind('click', function(e) {
         if (!note.id) return;
         return _this.app.showPrompt('Are you sure want to remove note?', function() {
@@ -1265,7 +1319,6 @@
           var ICON_SIZE, attDiv, file, iconsize, iconsizeexpanded, img, span;
           ICON_SIZE = 12;
           file = files[fi];
-          log('renderIcon', file, fi);
           attDiv = $(document.createElement('div')).addClass('note-file').appendTo(div);
           iconsize = _this.preciseEm(ICON_SIZE);
           iconsizeexpanded = notewidth - 8;
@@ -1383,6 +1436,13 @@
       return this.app.manager.storage.select('notes', ['sheet_id', sheet.id], function(err, arr) {
         var item, _i, _len;
         if (err) return _this.app.showError(err);
+        arr = arr.sort(function(a, b) {
+          if (a.y < b.y) return -1;
+          if (a.y > b.y) return 1;
+          if (a.x < b.x) return -1;
+          if (a.x > b.x) return 1;
+          return 0;
+        });
         parent.children('div').remove();
         for (_i = 0, _len = arr.length; _i < _len; _i++) {
           item = arr[_i];
@@ -1394,7 +1454,7 @@
       });
     };
 
-    Notepad.prototype.noteWidths = [50, 75, 90, 125];
+    Notepad.prototype.noteWidths = [50, 75, 90, 120, 150];
 
     Notepad.prototype.noteDefaultWidth = 1;
 
@@ -1407,7 +1467,7 @@
     Notepad.prototype.stick = true;
 
     Notepad.prototype.loadSheet = function(index, div) {
-      var canvas, clearSelector, divContent, divTitle, height, inRectangle, notesInRectangle, offsetToCoordinates, sheet, stickToGrid, template, templateConfig, width, zoom, _ref,
+      var canvas, clearSelector, configButton, divContent, divTitle, height, inRectangle, notesInRectangle, offsetToCoordinates, sheet, stickToGrid, template, templateConfig, width, zoom, _ref,
         _this = this;
       clearSelector = function() {
         if (_this.selectorDiv) {
@@ -1467,8 +1527,8 @@
       divContent = div.find('.sheet_content');
       canvas = canto(div.find('.sheet-canvas').get(0));
       canvas.reset();
-      width = Math.floor(template.width / this.zoomFactor);
-      height = Math.floor(template.height / this.zoomFactor);
+      width = this.preciseEm(template.width);
+      height = this.preciseEm(template.height);
       divContent.css({
         width: "" + width + "em",
         height: "" + height + "em"
@@ -1487,6 +1547,14 @@
           return _this.reloadSheetsBookmarks();
         });
       });
+      configButton = div.find('.sheet-toolbar-config');
+      if (templateConfig) {
+        configButton.removeClass('disabled').unbind('click').bind('click', function() {
+          return templateConfig.configure(template, sheet, _this);
+        });
+      } else {
+        configButton.addClass('disabled');
+      }
       divContent.unbind();
       divContent.bind('mousedown', function(e) {
         var coords, notes, offset, x, y, _ref2, _ref3;
@@ -1599,19 +1667,25 @@
               });
             }
             _this.app.manager.batch(config, function(err, arr) {
-              var note, updates, _j, _len2;
+              var index, moveX, moveY, note, updates, _ref5;
               if (err) return _this.app.showError(err);
               updates = [];
+              moveX = 0;
+              moveY = 0;
               arr = arr.sort(function(a, b) {
                 if (a.y < b.y) return -1;
                 if (a.y > b.y) return 1;
                 return a.x - b.x;
               });
-              for (_j = 0, _len2 = arr.length; _j < _len2; _j++) {
-                note = arr[_j];
+              for (index = 0, _ref5 = arr.length; 0 <= _ref5 ? index < _ref5 : index > _ref5; 0 <= _ref5 ? index++ : index--) {
+                note = arr[index];
+                if (index === 0) {
+                  moveX = note.x - x;
+                  moveY = note.y - y;
+                }
                 note.sheet_id = sheet.id;
-                note.x = x;
-                note.y = y;
+                note.x -= moveX;
+                note.y -= moveY;
                 y += _this.gridStep * 2;
                 updates.push({
                   type: 'update',
@@ -1631,7 +1705,7 @@
       canvas.width = divContent.width();
       canvas.height = divContent.height();
       zoom = divContent.width() / template.width;
-      if (templateConfig) templateConfig.render(template, sheet, canvas, zoom);
+      this.app.templateDrawer.render(template, sheet, canvas, zoom);
       this.loadNotes(sheet, divContent, canvas, zoom);
       return div;
     };
@@ -1759,8 +1833,8 @@
       var _ref, _ref2, _ref3, _ref4, _ref5;
       if (template == null) {
         template = {
-          width: 100,
-          height: 141
+          width: 102,
+          height: 144
         };
       }
       this.enableForm();
@@ -1797,31 +1871,39 @@
         _this = this;
       ul = $('.templates-list-ul');
       return this.app.manager.storage.select('templates', [], function(err, data) {
-        var a, found, item, li, _fn, _i, _len, _ref;
+        var a, found, item, li, section, _fn, _i, _j, _len, _len2, _ref, _ref2;
         if (err) return _this.app.showError(err);
         ul.empty();
         found = false;
-        _fn = function(item, li) {
-          return a.bind('click', function(e) {
-            _this.edit(item);
-            _this.refresh();
-            return false;
-          });
-        };
+        data = _this.app.sortTemplates(data);
         for (_i = 0, _len = data.length; _i < _len; _i++) {
-          item = data[_i];
-          li = $(document.createElement('li'));
-          if (((_ref = _this.selected) != null ? _ref.id : void 0) === item.id) {
-            found = true;
-            li.addClass('active');
-          }
-          a = $(document.createElement('a')).attr({
-            'href': '#'
-          });
-          a.text(item.name);
-          a.appendTo(li);
+          section = data[_i];
+          li = $(document.createElement('li')).addClass('nav-header');
+          li.text(section.title);
           li.appendTo(ul);
-          _fn(item, li);
+          _ref = section.items;
+          _fn = function(item, li) {
+            return a.bind('click', function(e) {
+              _this.edit(item);
+              _this.refresh();
+              return false;
+            });
+          };
+          for (_j = 0, _len2 = _ref.length; _j < _len2; _j++) {
+            item = _ref[_j];
+            li = $(document.createElement('li'));
+            if (((_ref2 = _this.selected) != null ? _ref2.id : void 0) === item.id) {
+              found = true;
+              li.addClass('active');
+            }
+            a = $(document.createElement('a')).attr({
+              'href': '#'
+            });
+            a.text(item.name);
+            a.appendTo(li);
+            li.appendTo(ul);
+            _fn(item, li);
+          }
         }
         if (!found) return _this.disableForm();
       }, {
@@ -1833,6 +1915,139 @@
 
   })();
 
+  TemplateConfig = (function() {
+
+    function TemplateConfig(app) {
+      this.app = app;
+    }
+
+    TemplateConfig.prototype.configure = function(tmpl, sheet, controller) {};
+
+    return TemplateConfig;
+
+  })();
+
+  WeekTemplateConfig = (function(_super) {
+
+    __extends(WeekTemplateConfig, _super);
+
+    function WeekTemplateConfig() {
+      WeekTemplateConfig.__super__.constructor.apply(this, arguments);
+    }
+
+    WeekTemplateConfig.prototype.tmpl = "<div class=\"modal hide\">\n  <div class=\"modal-header\">\n    <h3>Weekly sheet config</h3>\n  </div>\n  <div class=\"modal-body\">\n    <form class=\"form-horizontal\">\n      <div class=\"control-group\">\n        <label class=\"control-label\">Week starts from:</label>\n        <div class=\"controls\">\n          <input type=\"date\" class=\"week-dialog-date\" placeholder=\"Date\">\n        </div>\n      </div>\n      <div class=\"control-group\">\n        <label class=\"control-label\">Holidays</label>\n        <div class=\"controls week-dialog-holidays\">\n        </div>\n      </div>\n    </form>\n  </div>\n  <div class=\"modal-footer\">\n      <a href=\"#\" class=\"btn btn-primary week-dialog-do-save\">Save</a>\n      <a href=\"#\" class=\"btn week-dialog-do-close\">Close</a>\n  </div>\n</div>";
+
+    WeekTemplateConfig.prototype.dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+
+    WeekTemplateConfig.prototype.weekStarts = 1;
+
+    WeekTemplateConfig.prototype.defaultHolidays = {
+      0: true,
+      6: true
+    };
+
+    WeekTemplateConfig.prototype.configure = function(tmpl, sheet, controller) {
+      var checkbox, checkboxValues, checkboxes, checkboxesDiv, config, dateInput, day, div, index, label, _ref, _ref2, _ref3, _ref4,
+        _this = this;
+      log('Show template dialog');
+      div = $(this.tmpl).appendTo(document.body);
+      div.modal({
+        backdrop: 'static',
+        keyboard: false
+      });
+      div.find('.week-dialog-do-close').bind('click', function() {
+        return div.modal('hide').remove();
+      });
+      config = (_ref = sheet.config) != null ? _ref : {};
+      dateInput = div.find('.week-dialog-date');
+      if (config.date) dateInput.val(config.date);
+      checkboxes = [];
+      checkboxesDiv = div.find('.week-dialog-holidays');
+      checkboxValues = (_ref2 = config.holidays) != null ? _ref2 : this.defaultHolidays;
+      for (index = 0, _ref3 = this.dayNames.length; 0 <= _ref3 ? index < _ref3 : index > _ref3; 0 <= _ref3 ? index++ : index--) {
+        day = (index + this.weekStarts) % this.dayNames.length;
+        label = $(document.createElement('label')).addClass('checkbox inline').appendTo(checkboxesDiv);
+        label.text(this.dayNames[day]);
+        checkbox = $(document.createElement('input')).attr({
+          type: 'checkbox',
+          checked: (_ref4 = checkboxValues[day]) != null ? _ref4 : false
+        });
+        label.prepend(checkbox);
+        checkboxes.push(checkbox);
+      }
+      return div.find('.week-dialog-do-save').bind('click', function() {
+        var date, index, _ref5;
+        date = dateInput.val();
+        if (!date) return _this.app.showError('No date selected');
+        log('Date', date);
+        config.date = date;
+        config.holidays = {};
+        for (index = 0, _ref5 = _this.dayNames.length; 0 <= _ref5 ? index < _ref5 : index > _ref5; 0 <= _ref5 ? index++ : index--) {
+          day = (index + _this.weekStarts) % _this.dayNames.length;
+          if (checkboxes[index].attr('checked')) config.holidays[day] = true;
+        }
+        config.draw = _this.generate(config.date, config.holidays);
+        sheet.config = config;
+        return _this.app.manager.save('sheets', sheet, function(err) {
+          if (err) return _this.app.showError(err);
+          controller.reloadSheets();
+          return div.modal('hide').remove();
+        });
+      });
+    };
+
+    WeekTemplateConfig.prototype.drawStart = 11;
+
+    WeekTemplateConfig.prototype.drawTextY = -2;
+
+    WeekTemplateConfig.prototype.drawStep = 18;
+
+    WeekTemplateConfig.prototype.drawTextX = 85;
+
+    WeekTemplateConfig.prototype.drawLineX1 = 65;
+
+    WeekTemplateConfig.prototype.drawLineX2 = 98;
+
+    WeekTemplateConfig.prototype.drawLineColor = '#dddddd';
+
+    WeekTemplateConfig.prototype.drawTextColor = '#000000';
+
+    WeekTemplateConfig.prototype.drawTextHolidayColor = '#ff8888';
+
+    WeekTemplateConfig.prototype.generate = function(date, holidays) {
+      var dateText, day, draw, dt, index, textColor, y, _ref;
+      draw = [];
+      dt = new Date(date);
+      y = this.drawStart;
+      for (index = 0, _ref = this.dayNames.length; 0 <= _ref ? index < _ref : index > _ref; 0 <= _ref ? index++ : index--) {
+        day = dt.getDay();
+        draw.push({
+          type: 'line',
+          x1: this.drawLineX1,
+          y1: y,
+          x2: this.drawLineX2,
+          y2: y,
+          color: this.drawLineColor
+        });
+        textColor = holidays[day] ? this.drawTextHolidayColor : this.drawTextColor;
+        dateText = dt.getDate() < 10 ? '0' + dt.getDate() : '' + dt.getDate();
+        draw.push({
+          type: 'text',
+          x: this.drawTextX,
+          y: y + this.drawTextY,
+          color: textColor,
+          text: this.dayNames[day] + ' ' + dateText
+        });
+        dt.setDate(dt.getDate() + 1);
+        y += this.drawStep;
+      }
+      return draw;
+    };
+
+    return WeekTemplateConfig;
+
+  })(TemplateConfig);
+
   DrawTemplate = (function() {
 
     function DrawTemplate(app) {
@@ -1840,8 +2055,8 @@
     }
 
     DrawTemplate.prototype.render = function(tmpl, sheet, canvas, zoom) {
-      var data, _ref, _ref2;
-      data = (_ref = (_ref2 = tmpl.config) != null ? _ref2.draw : void 0) != null ? _ref : [];
+      var data, _ref, _ref2, _ref3, _ref4;
+      data = (_ref = sheet != null ? (_ref2 = sheet.config) != null ? _ref2.draw : void 0 : void 0) != null ? _ref : (_ref3 = (_ref4 = tmpl.config) != null ? _ref4.draw : void 0) != null ? _ref3 : [];
       return this.draw(data, canvas, zoom);
     };
 
@@ -1915,7 +2130,7 @@
         "type": "text",
         "x": 90,
         "y": 9,
-        "text": "��"
+        "text": "月"
       },
       {
         "type": "line",
@@ -1929,7 +2144,7 @@
         "type": "text",
         "x": 90,
         "y": 27,
-        "text": "��"
+        "text": "火"
       },
       {
         "type": "line",
@@ -1943,7 +2158,7 @@
         "type": "text",
         "x": 90,
         "y": 45,
-        "text": "��"
+        "text": "水"
       },
       {
         "type": "line",
@@ -1957,7 +2172,7 @@
         "type": "text",
         "x": 90,
         "y": 63,
-        "text": "��"
+        "text": "木"
       },
       {
         "type": "line",
@@ -1971,7 +2186,7 @@
         "type": "text",
         "x": 90,
         "y": 81,
-        "text": "��"
+        "text": "金"
       },
       {
         "type": "line",
@@ -1986,7 +2201,7 @@
         "x": 90,
         "y": 99,
         "color": "#ff8888",
-        "text": "�y"
+        "text": "土"
       },
       {
         "type": "line",
@@ -2001,7 +2216,7 @@
         "color": "#ff8888",
         "x": 90,
         "y": 117,
-        "text": "��"
+        "text": "日"
       }
     ]
   }

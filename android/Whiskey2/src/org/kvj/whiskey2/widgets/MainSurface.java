@@ -12,10 +12,10 @@ import org.kvj.whiskey2.data.BookmarkInfo;
 import org.kvj.whiskey2.data.NoteInfo;
 import org.kvj.whiskey2.data.SheetInfo;
 import org.kvj.whiskey2.data.TemplateInfo;
-import org.kvj.whiskey2.data.template.DrawTemplate;
 import org.kvj.whiskey2.widgets.adapters.SheetsAdapter;
 import org.kvj.whiskey2.widgets.v11.BookmarkDnDDecorator;
 import org.kvj.whiskey2.widgets.v11.NoteDnDDecorator;
+import org.kvj.whiskey2.widgets.v11.NoteDnDDecorator.NoteDnDInfo;
 import org.kvj.whiskey2.widgets.v11.PageDnDDecorator;
 
 import android.app.AlertDialog;
@@ -283,12 +283,9 @@ public class MainSurface extends RelativeLayout {
 			}
 		};
 		final TemplateInfo template = adapter.getController().getTemplate(sheet.templateID);
-		DrawTemplate templateConfig = adapter.getController().getTemplateConfig(template);
-		if (null != templateConfig) { // Have - instruct PageSurface
-			page.setTemplateConfig(templateConfig);
-			page.setTemplateInfo(template);
-			page.setSheetInfo(sheet);
-		}
+		page.setTemplateConfig(adapter.getController().getDrawTemplate());
+		page.setTemplateInfo(template);
+		page.setSheetInfo(sheet);
 		AsyncTask<Void, Void, List<NoteInfo>> task = new AsyncTask<Void, Void, List<NoteInfo>>() {
 
 			@Override
@@ -321,12 +318,29 @@ public class MainSurface extends RelativeLayout {
 
 	}
 
-	public void acceptDrop(PageSurface page, SheetInfo sheet, float x, float y, List<NoteInfo> notes) {
+	public void acceptDrop(PageSurface page, SheetInfo sheet, float x, float y, NoteDnDInfo dnDInfo) {
 		// Log.i(TAG, "Accept drop: " + x + "x" + y + ", " + notes);
-		int noteX = adapter.getController().stickToGrid(x * page.zoomFactor);
-		int noteY = adapter.getController().stickToGrid(y * page.zoomFactor);
 
-		for (NoteInfo note : notes) {
+		NoteInfo droppingNote = dnDInfo.notes.get(0);
+		// First check if we dropped on page
+		float dropX = page.marginLeft + x;
+		float dropY = page.marginTop + y;
+		for (NoteInfo note : page.notes) {
+			// Iterate and check coordinates
+			if (note.widget.getLeft() < dropX && dropX < note.widget.getRight() && note.widget.getTop() < dropY
+					&& dropY < note.widget.getBottom()) { // Within bounds
+				if (adapter.getController().createLink(droppingNote, note)) {
+					// Created link
+					adapter.getController().notifyNoteChanged(note);
+					return;
+				}
+			}
+		}
+
+		int noteX = adapter.getController().stickToGrid((x - dnDInfo.leftFix) * page.zoomFactor);
+		int noteY = adapter.getController().stickToGrid((y - dnDInfo.topFix) * page.zoomFactor);
+
+		for (NoteInfo note : dnDInfo.notes) {
 			NoteInfo noteInfo = adapter.getController().getNote(note.id);
 			if (null == noteInfo) {
 				Log.w(TAG, "Note not found: " + note.id);
@@ -457,8 +471,7 @@ public class MainSurface extends RelativeLayout {
 				@Override
 				public boolean onLongClick(View v) {
 					new AlertDialog.Builder(getContext()).setIcon(android.R.drawable.ic_dialog_alert)
-							.setTitle("Action")
-							.setMessage("What to do with file No  " + index + "?")
+							.setTitle("Action").setMessage("What to do with file No  " + index + "?")
 							.setPositiveButton("Open", new DialogInterface.OnClickListener() {
 
 								@Override
