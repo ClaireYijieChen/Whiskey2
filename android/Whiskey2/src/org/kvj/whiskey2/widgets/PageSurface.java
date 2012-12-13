@@ -35,7 +35,7 @@ public class PageSurface extends View {
 	}
 
 	private static final float TITLE_FONT_SIZE = 5;
-	private static final float TITLE_LEFT = 3;
+	private static final float TITLE_LEFT = 5;
 	private static final float TITLE_TOP = 7;
 	private static final float FONT_WIDTH = (float) 0.5;
 	protected static final String TAG = "PageSurface";
@@ -305,5 +305,13 @@ public class PageSurface extends View {
 
 	public boolean removeLink(NoteInfo note, long linkID) {
 		return false;
+	}
+
+	public TemplateInfo getTemplateInfo() {
+		return templateInfo;
+	}
+
+	public SheetInfo getSheetInfo() {
+		return sheetInfo;
 	}
 }

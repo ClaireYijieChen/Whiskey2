@@ -3,6 +3,7 @@ package org.kvj.whiskey2.widgets;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.json.JSONArray;
@@ -49,7 +50,6 @@ public class MainSurface extends RelativeLayout {
 
 	private static final String TAG = "MainSurface";
 	public static final int PAGE_MARGIN = 15;
-	public static final int PAGES_GAP = 10;
 	public static final int TEXT_PADDING = 1;
 	static final float ZOOM_STEP = 0.05f;
 	private static final float TEXT_SIZE = 5;
@@ -60,23 +60,25 @@ public class MainSurface extends RelativeLayout {
 	private static final int IMAGE_MARGIN = 6;
 	private static final float ICON_MARGIN = 1;
 	private static final float FILE_TEXT_SIZE = 4;
+	private static final float SPIRAL_CENTER_WIDTH = 8;
+	private static final float SPIRAL_RIGHT_WIDTH = 11;
+	private static final float SPIRAL_RIGHT_GAP = 4;
+	private static final float SPIRAL_LEFT_GAP = 8;
+	private static final int SPIRAL_ITEM_HEIGHT = 9;
+	protected static final int COVER_MARGIN = 10;
 
 	private boolean layoutCreated = false;
 	private float density = 1;
 	float zoom = 1.0f;
 
 	private float pageMargin;
-	private float pagesGap;
 	ViewGroup parent = null;
 	private SheetsAdapter adapter = null;
 	private int index = -1;
 	private FragmentActivity activity;
 	private ViewGroup toolbar = null;
-	RelativeLayout.LayoutParams toolbarParams = new LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT,
-			RelativeLayout.LayoutParams.WRAP_CONTENT);
 	private LayoutInflater inflater = null;
 	protected NoteInfo currentNote = null;
-	private int floatButtonSize;
 	private int width = 0;
 	private int height = 0;
 	private OnPageZoomListener pageZoomListener = null;
@@ -86,8 +88,6 @@ public class MainSurface extends RelativeLayout {
 		inflater = (LayoutInflater) getContext().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
 		density = getContext().getResources().getDisplayMetrics().density;
 		pageMargin = density * PAGE_MARGIN;
-		pagesGap = density * PAGES_GAP;
-		floatButtonSize = getContext().getResources().getDimensionPixelSize(R.dimen.float_note_button_size);
 	}
 
 	public void setController(int index, SheetsAdapter adapter, FragmentActivity fragmentActivity) {
@@ -120,59 +120,184 @@ public class MainSurface extends RelativeLayout {
 		parent = (ViewGroup) getParent();
 	}
 
-	private void createViews(final PageSurface page, final SheetInfo sheet, TemplateInfo template) {
-		int pagesDisplayed = 1;
-		int contentWidth = template.width;
-		for (int i = 0; i < page.notes.size(); i++) {
-			// Check width of every note
-			NoteInfo note = page.notes.get(i);
-			int noteRight = note.x + note.width;
-			if (noteRight > contentWidth) { // Wider
-				contentWidth = noteRight;
+	private PageSurface createPage(int index, SheetInfo sheet, TemplateInfo template) {
+		final PageSurface page = new PageSurface(getContext()) {
+			@Override
+			public boolean removeLink(NoteInfo note, long linkID) {
+				if (adapter.getController().removeLink(note, linkID)) {
+					adapter.getController().notifyNoteChanged(note);
+					return true;
+				}
+				return false;
 			}
+		};
+		page.setTemplateConfig(adapter.getController().getDrawTemplate());
+		page.setTemplateInfo(template);
+		page.setSheetInfo(sheet);
+		page.index = index;
+		page.title = sheet.title;
+		return page;
+	}
+
+	private boolean render() {
+		SheetInfo sheet = adapter.getItem(index);
+		if (null == sheet) { // Invalid sheet - nothing to show
+			return false;
 		}
+		TemplateInfo template = adapter.getController().getTemplate(sheet.templateID);
+		final List<PageSurface> pages = new ArrayList<PageSurface>();
+		pages.add(createPage(index, sheet, template));
+		int contentWidth = template.width;
 		int contentHeight = template.height;
 		float pageHeight = height - 2 * pageMargin;
-		float pageWidth = pageHeight * contentWidth / contentHeight;
-		if (pageWidth > width - 2 * pageMargin) { // Too wide
+		float pageWidth = pageHeight * contentWidth / contentHeight + density * SPIRAL_RIGHT_WIDTH;
+		if (pageWidth > width - 2 * pageMargin) {
+			// Too wide
 			pageWidth = width - 2 * pageMargin;
 			// Recalculate height
-			pageHeight = pageWidth * contentHeight / contentWidth;
+			pageHeight = (pageWidth - density * SPIRAL_RIGHT_WIDTH) * contentHeight / contentWidth;
 		}
-		float zoomFactor = contentWidth / pageWidth * zoom;
-		// Log.i(TAG, "Calc page size pass 2: " + pageWidth + "x" + pageHeight +
-		// ", " + width + "x" + height + " " + zoomFactor + ", " + density);
-		// if (zoomFactor > 0.2 / density) { //
-		// zoomFactor = (float) (0.2 / density);
-		// pageWidth = contentWidth / zoomFactor;
-		// pageHeight = contentHeight / zoomFactor;
-		// }
-		// Log.i(TAG, "Calc page size pass 3: " + pageWidth + "x" + pageHeight +
-		// ", " + width + "x" + height);
-		int leftGap = 0;
-		int left = (int) ((width - pageWidth) / 2);
-		if (left < floatButtonSize) {
-			left = (int) (width - floatButtonSize - pageWidth);
+		final float zoomFactor = contentHeight / pageHeight * zoom;
+		pageWidth /= zoom;
+		pageHeight /= zoom;
+		int minTemplateHeight = template.height;
+		SheetInfo otherSheet = adapter.getItem(index + 1);
+		if (null != otherSheet) { // Not empty
+			TemplateInfo otherTemplate = adapter.getController().getTemplate(otherSheet.templateID);
+			float otherTemplateWidth = otherTemplate.width / zoomFactor;
+			float otherTemplateHeight = otherTemplate.height / zoomFactor;
+			if (2 * pageMargin + template.width / zoomFactor + density * SPIRAL_CENTER_WIDTH + otherTemplateWidth < width) {
+				// Width is OK
+				if (2 * pageMargin + otherTemplateHeight < height) {
+					// Height is OK also
+					pageWidth = template.width / zoomFactor + density * SPIRAL_CENTER_WIDTH + otherTemplateWidth;
+					if (otherTemplate.height < minTemplateHeight) { // Smaller
+						minTemplateHeight = otherTemplate.height;
+					}
+					pages.add(createPage(index + 1, otherSheet, otherTemplate));
+				}
+			}
 		}
-		int top = (int) ((height - pageHeight) / 2);
-		// Log.i(TAG, "Left x top: " + left + "x" + top);
-		if (left < 0) { // Too big
-			left = 0;
+		final int totalWidth = (int) pageWidth;
+		final int totalHeight = (int) pageHeight;
+		final int spiralHeight = minTemplateHeight;
+		loadNotes(pages, new Runnable() {
+
+			@Override
+			public void run() {
+				removeAllViews();
+				int coverWidth = (int) (totalWidth + COVER_MARGIN * density);
+				int coverHeight = (int) (totalHeight + COVER_MARGIN * density);
+				int coverLeft = (width - coverWidth) / 2;
+				int coverTop = (height - coverHeight) / 2;
+				int leftFix = 0;
+				int topFix = 0;
+				if (coverLeft < 0) { // Fix
+					leftFix = -coverLeft;
+				}
+				if (coverTop < 0) { // Fix
+					topFix = -coverTop;
+				}
+				ImageView cover = new ImageView(getContext());
+				cover.setBackgroundResource(R.drawable.notepad_bg);
+				RelativeLayout.LayoutParams coverParams = new RelativeLayout.LayoutParams(coverWidth, coverHeight);
+				coverParams.leftMargin = coverLeft + leftFix;
+				coverParams.topMargin = coverTop + topFix;
+				coverParams.addRule(RelativeLayout.ALIGN_PARENT_TOP);
+				coverParams.addRule(RelativeLayout.ALIGN_PARENT_LEFT);
+				addView(cover, coverParams);
+
+				float left = (width - totalWidth) / 2 + leftFix;
+				View spiral = null;
+				RelativeLayout.LayoutParams spiralParams = null;
+				for (int i = 0; i < pages.size(); i++) {
+					PageSurface page = pages.get(i);
+					page.zoomFactor = zoomFactor;
+					float top = (height - page.getTemplateInfo().height / page.zoomFactor) / 2 + topFix;
+					renderPage(page, (int) left, (int) top);
+					left += page.getTemplateInfo().width / page.zoomFactor;
+					if (i == 0) { // First page - render spiral
+						spiral = new View(getContext());
+						boolean center = pages.size() > 1;
+						float spiralWidth = center ? SPIRAL_CENTER_WIDTH + SPIRAL_RIGHT_GAP + SPIRAL_LEFT_GAP
+								: SPIRAL_RIGHT_WIDTH + SPIRAL_RIGHT_GAP;
+						int _spiralHeight = (int) (Math.floor(spiralHeight / page.zoomFactor / SPIRAL_ITEM_HEIGHT) * SPIRAL_ITEM_HEIGHT);
+						spiralParams = new RelativeLayout.LayoutParams((int) (density * spiralWidth), _spiralHeight);
+						spiralParams.addRule(RelativeLayout.ALIGN_PARENT_TOP);
+						spiralParams.addRule(RelativeLayout.ALIGN_PARENT_LEFT);
+						spiralParams.leftMargin = (int) (left - density * SPIRAL_RIGHT_GAP) + leftFix;
+						spiralParams.topMargin = (height - _spiralHeight) / 2 + topFix;
+						spiral.setBackgroundResource(center ? R.drawable.spiral_center_bg : R.drawable.spiral_right_bg);
+
+						left += SPIRAL_CENTER_WIDTH * density;
+					}
+				}
+				addView(spiral, spiralParams);
+				for (int i = 0; i < pages.size(); i++) {
+					// Render page items (notes/bmarks)
+					PageSurface page = pages.get(i);
+					renderPageItems(page, i != 0);
+				}
+				toolbar = (ViewGroup) inflater.inflate(R.layout.float_note_toolbar, MainSurface.this, false);
+				addToolbarButton(R.drawable.float_edit, new OnClickListener() {
+
+					@Override
+					public void onClick(View v) {
+						if (null != currentNote) { // Edit note
+							startEditor(currentNote);
+						}
+					}
+				});
+				toolbar.setVisibility(View.GONE);
+				addView(toolbar);
+			}
+		});
+
+		return true;
+	}
+
+	private void renderPageItems(final PageSurface page, boolean leftToolbar) {
+		for (NoteInfo info : page.notes) { // Create textview's
+			View view = createNoteTextItem(page, info, leftToolbar);
+			info.widget = view;
+			decorateNoteView(view, info, page);
 		}
-		if (top < 0) { // Too big
-			top = 0;
+		List<BookmarkInfo> bmarks = adapter.getController().getBookmarks(page.getSheetInfo().id);
+		if (null != bmarks) { // Have bookmarks -> create
+			int bmarkWidth = (int) (BOOKMARK_WIDTH / page.zoomFactor);
+			int bmarkGap = (int) (BOOKMARK_GAP / page.zoomFactor);
+			int leftBMark = (int) (page.getTemplateInfo().width / page.zoomFactor - bmarkGap - bmarkWidth);
+			for (final BookmarkInfo info : bmarks) { // Create bookmarks
+				RelativeLayout.LayoutParams bmarkParams = new RelativeLayout.LayoutParams(
+						RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
+				bmarkParams.topMargin = page.marginTop;
+				bmarkParams.leftMargin = page.marginLeft + leftBMark;
+				BookmarkSign sign = new BookmarkSign(getContext(), bmarkWidth, info.color);
+				addView(sign, bmarkParams);
+				leftBMark -= bmarkGap + bmarkWidth;
+				decorateBookmark(page.getSheetInfo(), info, sign);
+				sign.setOnClickListener(new OnClickListener() {
+
+					@Override
+					public void onClick(View v) {
+						SuperActivity.notifyUser(getContext(), info.name);
+					}
+				});
+			}
 		}
-		RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams((int) (template.width / zoomFactor),
-				(int) (template.height / zoomFactor));
+	}
+
+	private void renderPage(final PageSurface page, int left, int top) {
+		RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(
+				(int) (page.getTemplateInfo().width / page.zoomFactor),
+				(int) (page.getTemplateInfo().height / page.zoomFactor));
 		page.title = adapter.getItem(index).title;
 		page.marginLeft = left;
 		page.index = index;
 		page.marginTop = top;
-		page.zoomFactor = zoomFactor;
 		params.setMargins(left, top, 0, 0);
 		params.addRule(RelativeLayout.ALIGN_PARENT_TOP);
 		params.addRule(RelativeLayout.ALIGN_PARENT_LEFT);
-		removeAllViews();
 		addView(page, params);
 		page.setOnFocusChangeListener(new OnFocusChangeListener() {
 
@@ -195,7 +320,7 @@ public class MainSurface extends RelativeLayout {
 			}
 		});
 		// requestLayout();
-		decorate(page, sheet);
+		decorate(page, page.getSheetInfo());
 		page.setOnLongClickListener(new OnLongClickListener() {
 
 			@Override
@@ -206,51 +331,31 @@ public class MainSurface extends RelativeLayout {
 				NoteInfo info = new NoteInfo();
 				info.x = adapter.getController().stickToGrid(x);
 				info.y = adapter.getController().stickToGrid(y);
-				info.sheetID = sheet.id;
+				info.sheetID = page.getSheetInfo().id;
 				startEditor(info);
 				return true;
 			}
 		});
-		for (NoteInfo info : page.notes) { // Create textview's
-			View view = createNoteTextItem(page, info);
-			info.widget = view;
-			decorateNoteView(view, info, page);
-		}
-		List<BookmarkInfo> bmarks = adapter.getController().getBookmarks(sheet.id);
-		if (null != bmarks) { // Have bookmarks -> create
-			int bmarkWidth = (int) (BOOKMARK_WIDTH / page.zoomFactor);
-			int bmarkGap = (int) (BOOKMARK_GAP / page.zoomFactor);
-			int leftBMark = (int) (template.width / page.zoomFactor - bmarkGap - bmarkWidth);
-			for (final BookmarkInfo info : bmarks) { // Create bookmarks
-				RelativeLayout.LayoutParams bmarkParams = new RelativeLayout.LayoutParams(
-						RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
-				bmarkParams.topMargin = page.marginTop;
-				bmarkParams.leftMargin = page.marginLeft + leftBMark;
-				BookmarkSign sign = new BookmarkSign(getContext(), bmarkWidth, info.color);
-				addView(sign, bmarkParams);
-				leftBMark -= bmarkGap + bmarkWidth;
-				decorateBookmark(sheet, info, sign);
-				sign.setOnClickListener(new OnClickListener() {
+	}
 
-					@Override
-					public void onClick(View v) {
-						SuperActivity.notifyUser(getContext(), info.name);
-					}
-				});
-			}
-		}
-		toolbar = (ViewGroup) inflater.inflate(R.layout.float_note_toolbar, this, false);
-		addToolbarButton(R.drawable.float_edit, new OnClickListener() {
+	private void loadNotes(final List<PageSurface> pages, final Runnable callback) {
+		AsyncTask<Void, Void, Void> task = new AsyncTask<Void, Void, Void>() {
 
 			@Override
-			public void onClick(View v) {
-				if (null != currentNote) { // Edit note
-					startEditor(currentNote);
+			protected Void doInBackground(Void... params) {
+				for (PageSurface page : pages) { //
+					page.notes = adapter.getController().getNotes(page.getSheetInfo().id);
 				}
+				return null;
 			}
-		});
-		toolbar.setVisibility(View.GONE);
-		addView(toolbar, toolbarParams);
+
+			@Override
+			protected void onPostExecute(Void result) {
+				callback.run();
+			}
+		};
+		task.execute();
+
 	}
 
 	private void decorateBookmark(SheetInfo sheet, BookmarkInfo bmark, BookmarkSign sign) {
@@ -268,39 +373,7 @@ public class MainSurface extends RelativeLayout {
 	void createLayout() {
 		layoutCreated = true;
 		currentNote = null;
-		final SheetInfo sheet = adapter.getItem(index);
-		if (null == sheet) {
-			return;
-		}
-		final PageSurface page = new PageSurface(getContext()) {
-			@Override
-			public boolean removeLink(NoteInfo note, long linkID) {
-				if (adapter.getController().removeLink(note, linkID)) {
-					adapter.getController().notifyNoteChanged(note);
-					return true;
-				}
-				return false;
-			}
-		};
-		final TemplateInfo template = adapter.getController().getTemplate(sheet.templateID);
-		page.setTemplateConfig(adapter.getController().getDrawTemplate());
-		page.setTemplateInfo(template);
-		page.setSheetInfo(sheet);
-		AsyncTask<Void, Void, List<NoteInfo>> task = new AsyncTask<Void, Void, List<NoteInfo>>() {
-
-			@Override
-			protected List<NoteInfo> doInBackground(Void... params) {
-				List<NoteInfo> notes = adapter.getController().getNotes(sheet.id);
-				return notes;
-			}
-
-			@Override
-			protected void onPostExecute(List<NoteInfo> result) {
-				page.notes.addAll(result);
-				createViews(page, sheet, template);
-			}
-		};
-		task.execute();
+		render();
 	}
 
 	private ImageButton addToolbarButton(int resID, OnClickListener listener) {
@@ -513,7 +586,7 @@ public class MainSurface extends RelativeLayout {
 		}
 	}
 
-	protected View createNoteTextItem(final PageSurface page, final NoteInfo info) {
+	protected View createNoteTextItem(final PageSurface page, final NoteInfo info, final boolean leftToolbar) {
 		final LinearLayout root = (LinearLayout) inflater.inflate(R.layout.one_note, this, false);
 		final TextView text = (TextView) root.findViewById(R.id.one_note_text);
 		root.setId((int) info.id);
@@ -554,8 +627,14 @@ public class MainSurface extends RelativeLayout {
 				}
 				if (hasFocus) { // Bring to front first
 					root.bringToFront();
+					RelativeLayout.LayoutParams toolbarParams = new LayoutParams(
+							RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
 					toolbarParams.addRule(RelativeLayout.ALIGN_TOP, root.getId());
-					toolbarParams.addRule(RelativeLayout.RIGHT_OF, root.getId());
+					if (leftToolbar) { // Show toolbar to left
+						toolbarParams.addRule(RelativeLayout.LEFT_OF, root.getId());
+					} else {
+						toolbarParams.addRule(RelativeLayout.RIGHT_OF, root.getId());
+					}
 					toolbar.setVisibility(VISIBLE);
 					toolbar.bringToFront();
 					toolbar.setLayoutParams(toolbarParams);

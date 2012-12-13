@@ -23,4 +23,7 @@
 				    
 	<color name="link_bg_ok">#ff00aa00</color>    
 	<color name="link_bg_ng">#ffff0000</color>
+	<color name="notepad_default_color">#ff552222</color>
+	<color name="notepad_border_color">#ff000000</color>
+	<dimen name="notepad_border_size">2dp</dimen>
 </resources>
