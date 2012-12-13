@@ -1,16 +1,25 @@
 package org.kvj.whiskey2.widgets;
 
 import android.content.Context;
+import android.graphics.Rect;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.widget.HorizontalScrollView;
 
 public class LockableHorizontalScrollView extends HorizontalScrollView {
 
+	private static final String TAG = "Scroll";
 	private boolean locked = true;
 
 	public LockableHorizontalScrollView(Context context, AttributeSet attrs) {
 		super(context, attrs);
+	}
+
+	@Override
+	protected boolean onRequestFocusInDescendants(int direction, Rect previouslyFocusedRect) {
+		Log.i(TAG, "Requested focus: " + direction);
+		return super.onRequestFocusInDescendants(direction, previouslyFocusedRect);
 	}
 
 	public boolean isLocked() {

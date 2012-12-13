@@ -49,7 +49,7 @@ public class MainSurface extends RelativeLayout {
 	}
 
 	private static final String TAG = "MainSurface";
-	public static final int PAGE_MARGIN = 15;
+	public static final int PAGE_MARGIN = 10;
 	public static final int TEXT_PADDING = 1;
 	static final float ZOOM_STEP = 0.05f;
 	private static final float TEXT_SIZE = 5;
@@ -65,7 +65,7 @@ public class MainSurface extends RelativeLayout {
 	private static final float SPIRAL_RIGHT_GAP = 4;
 	private static final float SPIRAL_LEFT_GAP = 8;
 	private static final int SPIRAL_ITEM_HEIGHT = 9;
-	protected static final int COVER_MARGIN = 10;
+	protected static final int COVER_MARGIN = 8;
 
 	private boolean layoutCreated = false;
 	private float density = 1;
@@ -221,12 +221,18 @@ public class MainSurface extends RelativeLayout {
 						boolean center = pages.size() > 1;
 						float spiralWidth = center ? SPIRAL_CENTER_WIDTH + SPIRAL_RIGHT_GAP + SPIRAL_LEFT_GAP
 								: SPIRAL_RIGHT_WIDTH + SPIRAL_RIGHT_GAP;
-						int _spiralHeight = (int) (Math.floor(spiralHeight / page.zoomFactor / SPIRAL_ITEM_HEIGHT) * SPIRAL_ITEM_HEIGHT);
-						spiralParams = new RelativeLayout.LayoutParams((int) (density * spiralWidth), _spiralHeight);
+
+						double _spiralHeight = spiralHeight / page.zoomFactor;
+						double heightFix = density * SPIRAL_ITEM_HEIGHT;
+						_spiralHeight = Math.floor(_spiralHeight / heightFix) * heightFix;
+						// (int) (Math.floor(spiralHeight / page.zoomFactor /
+						// SPIRAL_ITEM_HEIGHT) * SPIRAL_ITEM_HEIGHT);
+						spiralParams = new RelativeLayout.LayoutParams((int) (density * spiralWidth),
+								(int) _spiralHeight);
 						spiralParams.addRule(RelativeLayout.ALIGN_PARENT_TOP);
 						spiralParams.addRule(RelativeLayout.ALIGN_PARENT_LEFT);
-						spiralParams.leftMargin = (int) (left - density * SPIRAL_RIGHT_GAP) + leftFix;
-						spiralParams.topMargin = (height - _spiralHeight) / 2 + topFix;
+						spiralParams.leftMargin = (int) (left - density * SPIRAL_RIGHT_GAP);
+						spiralParams.topMargin = (int) ((height - _spiralHeight) / 2 + topFix);
 						spiral.setBackgroundResource(center ? R.drawable.spiral_center_bg : R.drawable.spiral_right_bg);
 
 						left += SPIRAL_CENTER_WIDTH * density;
@@ -613,7 +619,16 @@ public class MainSurface extends RelativeLayout {
 
 			@Override
 			public void onClick(View v) {
-				root.requestFocus();
+				// Log.i(TAG, "Click on note: " + info.collapsible);
+				if (info.collapsible) { // Change state
+					RelativeLayout.LayoutParams params = (LayoutParams) root.getLayoutParams();
+					params.height = RelativeLayout.LayoutParams.WRAP_CONTENT;
+					info.collapsed = false;
+					root.setLayoutParams(params);
+				}
+				if (!root.hasFocus()) {
+					root.requestFocus();
+				}
 			}
 		});
 		root.setOnFocusChangeListener(new OnFocusChangeListener() {
@@ -640,15 +655,11 @@ public class MainSurface extends RelativeLayout {
 					toolbar.setLayoutParams(toolbarParams);
 					currentNote = info;
 				}
-				if (info.collapsible) { // Change state
+				if (info.collapsible && !hasFocus) { // Change state
 					RelativeLayout.LayoutParams params = (LayoutParams) root.getLayoutParams();
-					if (hasFocus) { // Expand
-						params.height = RelativeLayout.LayoutParams.WRAP_CONTENT;
-					} else {
-						params.height = (int) (COLLPASED_HEIGHT / page.zoomFactor);
-					}
-					info.collapsed = !info.collapsed;
-					root.requestLayout();
+					params.height = (int) (COLLPASED_HEIGHT / page.zoomFactor);
+					info.collapsed = true;
+					root.setLayoutParams(params);
 				}
 			}
 		});

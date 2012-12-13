@@ -86,7 +86,7 @@ public class NotepadActivity extends SherlockFragmentActivity implements Control
 
 	private void selectPage(int position, boolean animate) {
 		pager.setCurrentItem(position, animate);
-		pager.requestFocus();
+		// pager.requestFocus();
 		// sheetSelector.collapseExpand(true);
 	}
 
