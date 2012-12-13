@@ -52,6 +52,10 @@
 }
 
 .notepad-sheets-wrap {
+    padding: 0.7em;
+    display: inline-block;
+    border: 3px solid #222222;
+    background-color: #552222;
 }
 
 .notepad-sheet-miniature {
@@ -87,12 +91,35 @@
   visibility: visible;
 }
 
+.sheet-spiral {
+  display: inline-block;
+  background-position: center top;
+  background-repeat: repeat-y;
+  vertical-align: middle;
+  z-index: 1;
+  background-clip: padding-box;
+  background-origin: content-box;
+  position: relative;
+}
+
+.spiral-center {
+  background-image: url(img/spiral-center1.png);
+  width: 40px;
+  margin-left: -8px;
+  margin-right: -16px;
+}
+
+.spiral-right {
+  background-image: url(img/spiral-right1.png);
+  width: 30px;
+  margin-left: -8px;
+}
+
 .sheet {
   display: inline-block;
   border: 1px solid #aaaaaa;
+  background-color: #ffffff;
   box-shadow: 0 0 3px #888888;
-  margin-left: 1em;
-  margin-right: 1em;
   overflow: visible;
   position: relative;
   vertical-align: middle;
@@ -105,7 +132,7 @@
 
 .sheet_title {
   position: absolute;
-  left: 0.5em;
+  left: 15px;
   top: 0.5em;
   font-weight: bold;
   font-size: 1.1em;

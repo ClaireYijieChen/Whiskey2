@@ -617,21 +617,46 @@ class Notepad
       divTitle = $(document.createElement('div')).addClass('sheet_title').appendTo div
       divToolbar = $('#sheet-toolbar-template').clone().removeClass('hide').appendTo div
       @sheetDivs.push div
+      div.hide()
+      if i is 0
+        @spiralDiv = $(document.createElement('div')).addClass('sheet-spiral').appendTo @divContent
 
   loadSheets: (index) ->
     @selectedNotes = {}
     @lastSheetID = @sheets[index]?.id
     count = 0
     @notes = []
+    NO_SPIRAL = 0
+    RIGHT_SPIRAL = 1
+    CENTER_SPIRAL = 2
+    spiralType = NO_SPIRAL
+    spiralHeight = -1
+    sheetsVisible = 0
+    if index+@maxSheetsVisible >= @sheets.length
+      index = @sheets.length - @maxSheetsVisible
+      if index<0 then index = 0
     while count<@maxSheetsVisible
       div = @sheetDivs[count]
       if not @sheets[index]
         div.hide()
       else
         div.show()
-        @loadSheet(index, div)
+        sheetsVisible++
+        tmpl = @loadSheet(index, div)
+        if div.height()<spiralHeight or spiralHeight<0 then spiralHeight = div.height()
       index++
       count++
+    if sheetsVisible is 1 then spiralType = RIGHT_SPIRAL
+    else if sheetsVisible > 1 then spiralType = CENTER_SPIRAL
+    spiralHeight = ""+(Math.floor(spiralHeight/18)*18)+"px"
+    switch spiralType
+      when NO_SPIRAL
+        @spiralDiv.hide()
+      when RIGHT_SPIRAL
+        @spiralDiv.show().height(spiralHeight).attr('class': 'sheet-spiral spiral-right')
+      when CENTER_SPIRAL
+        @spiralDiv.show().height(spiralHeight).attr('class': 'sheet-spiral spiral-center')
+
 
   showNotesDialog: (sheet, note, handler) ->
     $('#note-dialog').modal backdrop: 'static', keyboard: no
@@ -1109,7 +1134,7 @@ class Notepad
     #if templateConfig
     @app.templateDrawer.render template, sheet, canvas, zoom
     @loadNotes sheet, divContent, canvas, zoom
-    return div
+    return template
 
 class TemplateManager
 

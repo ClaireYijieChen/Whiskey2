@@ -958,30 +958,66 @@
         canvas = $(document.createElement('canvas')).addClass('sheet-canvas').appendTo(divContent);
         divTitle = $(document.createElement('div')).addClass('sheet_title').appendTo(div);
         divToolbar = $('#sheet-toolbar-template').clone().removeClass('hide').appendTo(div);
-        _results.push(this.sheetDivs.push(div));
+        this.sheetDivs.push(div);
+        div.hide();
+        if (i === 0) {
+          _results.push(this.spiralDiv = $(document.createElement('div')).addClass('sheet-spiral').appendTo(this.divContent));
+        } else {
+          _results.push(void 0);
+        }
       }
       return _results;
     };
 
     Notepad.prototype.loadSheets = function(index) {
-      var count, div, _ref, _results;
+      var CENTER_SPIRAL, NO_SPIRAL, RIGHT_SPIRAL, count, div, sheetsVisible, spiralHeight, spiralType, tmpl, _ref;
       this.selectedNotes = {};
       this.lastSheetID = (_ref = this.sheets[index]) != null ? _ref.id : void 0;
       count = 0;
       this.notes = [];
-      _results = [];
+      NO_SPIRAL = 0;
+      RIGHT_SPIRAL = 1;
+      CENTER_SPIRAL = 2;
+      spiralType = NO_SPIRAL;
+      spiralHeight = -1;
+      sheetsVisible = 0;
+      if (index + this.maxSheetsVisible >= this.sheets.length) {
+        index = this.sheets.length - this.maxSheetsVisible;
+        if (index < 0) index = 0;
+      }
       while (count < this.maxSheetsVisible) {
         div = this.sheetDivs[count];
         if (!this.sheets[index]) {
           div.hide();
         } else {
           div.show();
-          this.loadSheet(index, div);
+          sheetsVisible++;
+          tmpl = this.loadSheet(index, div);
+          if (div.height() < spiralHeight || spiralHeight < 0) {
+            spiralHeight = div.height();
+          }
         }
         index++;
-        _results.push(count++);
+        count++;
       }
-      return _results;
+      if (sheetsVisible === 1) {
+        spiralType = RIGHT_SPIRAL;
+      } else if (sheetsVisible > 1) {
+        spiralType = CENTER_SPIRAL;
+      }
+      spiralHeight = "" + (Math.floor(spiralHeight / 18) * 18) + "px";
+      switch (spiralType) {
+        case NO_SPIRAL:
+          return this.spiralDiv.hide();
+        case RIGHT_SPIRAL:
+          return this.spiralDiv.show().height(spiralHeight).attr({
+            'class': 'sheet-spiral spiral-right'
+          });
+        case CENTER_SPIRAL:
+          return this.spiralDiv.show().height(spiralHeight).attr({
+            'class': 'sheet-spiral spiral-center'
+          });
+      }
     };
 
     Notepad.prototype.showNotesDialog = function(sheet, note, handler) {
@@ -1707,7 +1743,7 @@
       zoom = divContent.width() / template.width;
       this.app.templateDrawer.render(template, sheet, canvas, zoom);
       this.loadNotes(sheet, divContent, canvas, zoom);
-      return div;
+      return template;
     };
 
     return Notepad;
