@@ -52,9 +52,9 @@
 }
 
 .notepad-sheets-wrap {
-    padding: 0.7em;
+    padding: 0.5em;
     display: inline-block;
-    border: 3px solid #222222;
+    border: 2px solid #222222;
     background-color: #552222;
 }
 
