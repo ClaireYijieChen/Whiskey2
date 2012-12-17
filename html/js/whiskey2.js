@@ -810,7 +810,7 @@
       minHeight = 3;
       maxHeight = 30;
       oneItemHeight = 50;
-      height = $(window).height() - 150;
+      height = $(window).height() - 180;
       step = maxHeight;
       if (sheets.length > 1) {
         step = Math.floor((height - oneItemHeight) / (sheets.length - 1));

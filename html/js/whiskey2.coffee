@@ -127,11 +127,11 @@ class Whiskey2
           if err then return @showError err
           @refreshNotepads selectID
       for i in [0...arr.length]
-        item = arr[i] # Revert
+        item = arr[i]
         li = $(document.createElement('li')).addClass('main-tab-notepad')
         a = $(document.createElement('a')).attr(href: '#np'+item.id).text(' '+item.name).appendTo li
         a.prepend('<i class="icon-book"></i>')
-        li. insertBefore $('#main-tab-templates')
+        li.insertBefore $('#main-tab-templates')
         div = $(document.createElement('div')).addClass('tab-pane main-tab-notepad').attr(id: 'np'+item.id)
         $('#main-tabs-content').append(div)
         do (a, item, i) =>
@@ -511,7 +511,7 @@ class Notepad
     minHeight = 3
     maxHeight = 30
     oneItemHeight = 50
-    height = $(window).height() - 150
+    height = $(window).height() - 180
     step = maxHeight
     if sheets.length>1
       step = Math.floor((height-oneItemHeight)/(sheets.length-1))

@@ -301,6 +301,11 @@
 .note-dots {
     position: absolute;
     z-index: 5;
+    opacity: 0.05;
+}
+
+.note-dots:hover {
+    opacity: 1;
 }
 
 .note-dot {
