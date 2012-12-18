@@ -108,14 +108,13 @@
     };
 
     Whiskey2.prototype.dragGetType = function(e, type) {
-      var _ref, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8;
-      log('getType:', e != null ? (_ref = e.originalEvent) != null ? _ref.dataTransfer : void 0 : void 0, e != null ? (_ref2 = e.originalEvent) != null ? _ref2.dataTransfer.files : void 0 : void 0);
-      if ('Files' === type && (e != null ? (_ref3 = e.originalEvent) != null ? (_ref4 = _ref3.dataTransfer) != null ? _ref4.files : void 0 : void 0 : void 0)) {
+      var _ref, _ref2, _ref3, _ref4, _ref5, _ref6;
+      if ('Files' === type && (e != null ? (_ref = e.originalEvent) != null ? (_ref2 = _ref.dataTransfer) != null ? _ref2.files : void 0 : void 0 : void 0)) {
         return e.originalEvent.dataTransfer.files;
       }
-      if (e != null ? (_ref5 = e.originalEvent) != null ? (_ref6 = _ref5.dataTransfer) != null ? _ref6.getData : void 0 : void 0 : void 0) {
+      if (e != null ? (_ref3 = e.originalEvent) != null ? (_ref4 = _ref3.dataTransfer) != null ? _ref4.getData : void 0 : void 0 : void 0) {
         try {
-          return JSON.parse(e != null ? (_ref7 = e.originalEvent) != null ? (_ref8 = _ref7.dataTransfer) != null ? _ref8.getData(type) : void 0 : void 0 : void 0);
+          return JSON.parse(e != null ? (_ref5 = e.originalEvent) != null ? (_ref6 = _ref5.dataTransfer) != null ? _ref6.getData(type) : void 0 : void 0 : void 0);
         } catch (e) {
           return null;
         }
@@ -1262,7 +1261,7 @@
         return _results;
       };
       loadNote = function(note) {
-        var div, fi, files, i, line, lines, notewidth, renderIcon, width, x, y, _ref, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8, _results;
+        var div, fi, files, i, line, lines, notewidth, renderIcon, resizer, width, x, y, _ref, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8;
         div = $(document.createElement('div')).addClass('note').appendTo(parent);
         div.attr({
           draggable: true,
@@ -1430,20 +1429,26 @@
           renderIcon(fi);
         }
         lines = ((_ref7 = note.text) != null ? _ref7 : '').split('\n');
-        _results = [];
         for (i = 0, _ref8 = lines.length; 0 <= _ref8 ? i < _ref8 : i > _ref8; 0 <= _ref8 ? i++ : i--) {
           line = lines[i];
           if (!line) {
             if (i < lines.length - 1) {
-              _results.push($(document.createElement('div')).addClass('note-br').html('&nbsp;').appendTo(div));
-            } else {
-              _results.push(void 0);
+              $(document.createElement('div')).addClass('note-br').html('&nbsp;').appendTo(div);
             }
           } else {
-            _results.push($(document.createElement('div')).addClass('note-line').appendTo(div).text(line));
+            $(document.createElement('div')).addClass('note-line').appendTo(div).text(line);
           }
         }
-        return _results;
+        resizer = $(document.createElement('div')).addClass('note-resizer').appendTo(div);
+        resizer.attr({
+          draggable: true
+        });
+        return resizer.bind('dragstart', function(e) {
+          _this.app.dragSetType(e, 'custom/note-resize', {
+            id: note.id
+          });
+          return e.stopPropagation();
+        });
       };
       renderBookmarks = function(divItem) {
         var arr, bmarkstep, bmarkx, bmarky, divBMark, item, _i, _len, _results;
@@ -1663,23 +1668,47 @@
         return e.preventDefault();
       });
       divContent.bind('dragover', function(e) {
+        if (_this.app.dragHasType(e, 'custom/note-resize')) e.preventDefault();
         if (_this.app.dragHasType(e, 'custom/note')) e.preventDefault();
         if (_this.app.dragHasType(e, 'custom/bmark')) e.preventDefault();
         return false;
       });
       divContent.bind('drop', function(e) {
-        var bmark, config, id, offset, otherNote, x, y, _i, _len, _ref2, _ref3, _ref4;
+        var bmark, config, id, offset, otherNote, resizer, x, y, _i, _len, _ref2, _ref3, _ref4, _ref5;
         bmark = _this.app.dragGetType(e, 'custom/bmark');
         if (bmark) {
           _this.moveBookmark(bmark.id, sheet);
           e.stopPropagation();
           return false;
         }
+        resizer = _this.app.dragGetType(e, 'custom/note-resize');
+        if (resizer) {
+          offset = _this.app.dragGetOffset(e, divContent);
+          _ref2 = offsetToCoordinates(offset.left, offset.top), x = _ref2[0], y = _ref2[1];
+          _this.app.manager.findOne('notes', resizer.id, function(err, note) {
+            var newWidth, w, _i, _len, _ref3;
+            if (err) return _this.app.showError(err);
+            width = Math.max(_this.noteWidths[0], x - note.x);
+            newWidth = width;
+            _ref3 = _this.noteWidths;
+            for (_i = 0, _len = _ref3.length; _i < _len; _i++) {
+              w = _ref3[_i];
+              if (w <= width) newWidth = w;
+            }
+            note.width = newWidth;
+            return _this.app.manager.save('notes', note, function(err) {
+              if (err) return _this.app.showError(err);
+              return _this.reloadSheets();
+            });
+          });
+          e.stopPropagation();
+          return false;
+        }
         if (_this.app.dragHasType(e, 'custom/note')) {
           otherNote = _this.app.dragGetType(e, 'custom/note');
           offset = _this.app.dragGetOffset(e, divContent);
-          _ref2 = offsetToCoordinates(offset.left - otherNote.x, offset.top - otherNote.y), x = _ref2[0], y = _ref2[1];
-          _ref3 = stickToGrid(x, y), x = _ref3[0], y = _ref3[1];
+          _ref3 = offsetToCoordinates(offset.left - otherNote.x, offset.top - otherNote.y), x = _ref3[0], y = _ref3[1];
+          _ref4 = stickToGrid(x, y), x = _ref4[0], y = _ref4[1];
           if (otherNote.id) {
             _this.app.manager.findOne('notes', otherNote != null ? otherNote.id : void 0, function(err, note) {
               if (err) return _this.app.showError(err);
@@ -1693,9 +1722,9 @@
             });
           } else {
             config = [];
-            _ref4 = otherNote.ids;
-            for (_i = 0, _len = _ref4.length; _i < _len; _i++) {
-              id = _ref4[_i];
+            _ref5 = otherNote.ids;
+            for (_i = 0, _len = _ref5.length; _i < _len; _i++) {
+              id = _ref5[_i];
               config.push({
                 type: 'findOne',
                 id: id,
@@ -1703,7 +1732,7 @@
               });
             }
             _this.app.manager.batch(config, function(err, arr) {
-              var index, moveX, moveY, note, updates, _ref5;
+              var index, moveX, moveY, note, updates, _ref6;
               if (err) return _this.app.showError(err);
               updates = [];
               moveX = 0;
@@ -1713,7 +1742,7 @@
                 if (a.y > b.y) return 1;
                 return a.x - b.x;
               });
-              for (index = 0, _ref5 = arr.length; 0 <= _ref5 ? index < _ref5 : index > _ref5; 0 <= _ref5 ? index++ : index--) {
+              for (index = 0, _ref6 = arr.length; 0 <= _ref6 ? index < _ref6 : index > _ref6; 0 <= _ref6 ? index++ : index--) {
                 note = arr[index];
                 if (index === 0) {
                   moveX = note.x - x;

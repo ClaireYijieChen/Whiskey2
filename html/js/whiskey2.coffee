@@ -70,7 +70,7 @@ class Whiskey2
       e.originalEvent.dataTransfer.setData type, JSON.stringify(value)
 
   dragGetType: (e, type) ->
-    log 'getType:', e?.originalEvent?.dataTransfer, e?.originalEvent?.dataTransfer.files
+    # log 'getType:', e?.originalEvent?.dataTransfer, e?.originalEvent?.dataTransfer.files
     if 'Files' is type and e?.originalEvent?.dataTransfer?.files
       return e.originalEvent.dataTransfer.files
     if e?.originalEvent?.dataTransfer?.getData
@@ -936,6 +936,12 @@ class Notepad
             $(document.createElement('div')).addClass('note-br').html('&nbsp;').appendTo div
         else
           $(document.createElement('div')).addClass('note-line').appendTo(div).text line
+      resizer = $(document.createElement('div')).addClass('note-resizer').appendTo(div)
+      resizer.attr draggable: yes
+      resizer.bind 'dragstart', (e) =>
+        @app.dragSetType e, 'custom/note-resize', {id: note.id}
+        e.stopPropagation()
+
     # , 'archived', {op: '<>', var: 1}
     renderBookmarks = (divItem) =>
       arr = @app.bookmarks[sheet.id]
@@ -1074,6 +1080,9 @@ class Notepad
         @reloadSheets()
       e.preventDefault()
     divContent.bind 'dragover', (e) =>
+      #'custom/note-resize'
+      if @app.dragHasType e, 'custom/note-resize'
+        e.preventDefault()
       if @app.dragHasType e, 'custom/note'
         e.preventDefault()
       if @app.dragHasType e, 'custom/bmark'
@@ -1083,6 +1092,23 @@ class Notepad
       bmark = @app.dragGetType e, 'custom/bmark'
       if bmark
         @moveBookmark bmark.id, sheet
+        e.stopPropagation()
+        return no
+      resizer = @app.dragGetType e, 'custom/note-resize'
+      if resizer
+        offset = @app.dragGetOffset e, divContent
+        [x, y] = offsetToCoordinates offset.left, offset.top
+        @app.manager.findOne 'notes', resizer.id, (err, note) =>
+          if err then return @app.showError err
+          width = Math.max(@noteWidths[0], x-note.x)
+          newWidth = width
+          for w in @noteWidths
+            if w<=width
+              newWidth = w
+          note.width = newWidth
+          @app.manager.save 'notes', note, (err) =>
+            if err then return @app.showError err
+            @reloadSheets()
         e.stopPropagation()
         return no
       if @app.dragHasType e, 'custom/note'
