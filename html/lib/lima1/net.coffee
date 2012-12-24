@@ -39,6 +39,7 @@ class OAuthProvider
 	constructor: (@config, @transport) ->
 		@tokenURL = @config?.tokenURL ? '/token'
 		@clientID = @config?.clientID ? 'no_client_id'
+		@scope = @config?.scope ? 'app'
 		@token = @config?.token
 
 	getFullURL: (app, path) ->
@@ -69,6 +70,7 @@ class OAuthProvider
 				password: password
 				client_id: @clientID
 				grant_type: 'password'
+				scope: @scope
 			}
 		}, (error, data) =>
 			log 'Response:', error, data

@@ -621,7 +621,7 @@ class SchemaInfo
 
   constructor: (@json) ->
     @upgrades = @parseSchema @json
-    @rev = @json._rev
+    @rev = @json._rev ? 0
 
   parseSchema: (json) ->
     for name, item of json
@@ -692,9 +692,7 @@ class SchemaInfo
       sql += ", f_#{field}"
     sqls.push sql+')'
 
-
 data_table_template = '(id integer primary key, status integer default 0, updated integer default 0, own integer default 1, stream text, data text'
-
 
 class StorageProvider
 
@@ -704,6 +702,7 @@ class StorageProvider
   SYNC_NETWORK: 0
   SYNC_READ_DATA: 1
   SYNC_WRITE_DATA: 2
+  lastOut: 0
 
   constructor: (@db) ->
     @on_channel_state = new EventEmitter this
@@ -746,6 +745,13 @@ class StorageProvider
     @db.query 'update schema set token=?', [token], (err) =>
       if handler then handler err
 
+  ping: (app, oauth, handler) ->
+    rev = @schemaInfo?.rev ? 0
+    url = "/rest/ping?from=#{@lastOut}&rev=#{rev}&"
+    oauth.rest app, url, null, (err, res) =>
+      if err then return handler err
+      handler null, res.d ? no
+
   sync: (app, oauth, handler, progress_handler) ->
     # log 'Starting sync...', app
     oauth.token = @token
@@ -762,6 +768,7 @@ class StorageProvider
         @on_channel_state.emit 'state', {state: @CHANNEL_NO_DATA}
       progress_handler @SYNC_WRITE_DATA
       @db.query 'insert into updates (id, version_in, version_out) values (?, ?, ?)', [@_id(), in_from, out_from], () =>
+        @lastOut = out_from
         for name, item of @schemaInfo.tables
           @db.query 'delete from t_'+name+' where status=? and updated<=?', [3, in_from], () =>
         handler err, {
@@ -1134,6 +1141,7 @@ class DataManager
 
 
   sync_timeout: 30
+  ping_timeout: 180
   channel_timeout: 60*15
   timeout_id: null
   in_sync: no
@@ -1145,6 +1153,11 @@ class DataManager
       @storage.stateListener.on 'change', () =>
         @schedule_sync()
       handler null
+
+  start_ping: (handler) ->
+    setInterval =>
+      @ping handler
+    , @ping_timeout*1000
 
   unschedule_sync: () ->
     # log 'Terminating schedule', @timeout_id
@@ -1241,6 +1254,11 @@ class DataManager
 
   set: (name, value) ->
     return @storage.db.set name, value
+
+  ping: (handler) ->
+    if @in_sync then return handler null, no
+    @storage.ping @app, @oauth, (err, haveData) ->
+      handler err, haveData
 
   sync: (handler, progress_handler = () ->) ->
     if @in_sync then return no

@@ -41,6 +41,8 @@ class Whiskey2
       @refreshBookmarks () =>
         @refreshNotepads()
         @refreshTemplates()
+      @manager.start_ping (err, haveData) ->
+        
       @sync()
 
   showLoginDialog: ->
