@@ -42,7 +42,7 @@ class Whiskey2
         @refreshNotepads()
         @refreshTemplates()
       @manager.start_ping (err, haveData) ->
-        
+        if haveData then @sync()
       @sync()
 
   showLoginDialog: ->
