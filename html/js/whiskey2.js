@@ -65,7 +65,7 @@
           return _this.refreshTemplates();
         });
         _this.manager.start_ping(function(err, haveData) {
-          if (haveData) return this.sync();
+          if (haveData) return _this.sync();
         });
         return _this.sync();
       });
@@ -1264,7 +1264,38 @@
         return _results;
       };
       loadNote = function(note) {
-        var div, fi, files, i, line, lines, notewidth, renderIcon, resizer, width, x, y, _ref, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8;
+        var div, fi, files, i, line, lines, mergeNotes, notewidth, renderIcon, resizer, width, x, y, _ref, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8;
+        mergeNotes = function(ids) {
+          var config, id, _i, _len;
+          config = [
+            {
+              type: 'findOne',
+              id: note.id,
+              stream: 'notes'
+            }
+          ];
+          for (_i = 0, _len = ids.length; _i < _len; _i++) {
+            id = ids[_i];
+            config.push({
+              type: 'findOne',
+              id: id,
+              stream: 'notes'
+            });
+          }
+          return _this.app.manager.batch(config, function(err, arr) {
+            var i, n, nn, _ref;
+            if (err) return _this.app.showError(err);
+            n = arr[0];
+            for (i = 1, _ref = arr.length; 1 <= _ref ? i < _ref : i > _ref; 1 <= _ref ? i++ : i--) {
+              nn = arr[i];
+              if (nn.text) n.text += '\n> ' + nn.text;
+            }
+            return _this.app.manager.save('notes', n, function(err) {
+              if (err) return _this.app.showError(err);
+              return _this.reloadSheets();
+            });
+          });
+        };
         div = $(document.createElement('div')).addClass('note').appendTo(parent);
         div.attr({
           draggable: true,
@@ -1295,13 +1326,16 @@
             return _this.app.dragSetType(e, 'custom/note', {
               ids: ids,
               x: offset.left,
-              y: offset.top
+              y: offset.top,
+              append: e.shiftKey
             });
           } else {
             return _this.app.dragSetType(e, 'custom/note', {
               id: note.id,
               x: offset.left,
-              y: offset.top
+              y: offset.top,
+              link: e.ctrlKey,
+              append: e.shiftKey
             });
           }
         });
@@ -1313,12 +1347,17 @@
         div.bind('drop', function(e) {
           var files, noteData;
           noteData = _this.app.dragGetType(e, 'custom/note');
-          if (noteData != null ? noteData.id : void 0) {
+          if ((noteData != null ? noteData.id : void 0) && (noteData != null ? noteData.link : void 0)) {
             log('Dropped note:', noteData);
             if (_this.createNoteLink(note, noteData.id)) {
               e.stopPropagation();
               return false;
             }
+          }
+          if (noteData != null ? noteData.append : void 0) {
+            mergeNotes(noteData.id ? [noteData.id] : noteData.ids);
+            e.stopPropagation();
+            return false;
           }
           files = _this.app.dragGetType(e, 'Files');
           if (files && files.length > 0) {
@@ -1506,7 +1545,7 @@
 
     Notepad.prototype.colors = 8;
 
-    Notepad.prototype.gridStep = 6;
+    Notepad.prototype.gridStep = 3;
 
     Notepad.prototype.stick = true;
 
@@ -1754,7 +1793,6 @@
                 note.sheet_id = sheet.id;
                 note.x -= moveX;
                 note.y -= moveY;
-                y += _this.gridStep * 2;
                 updates.push({
                   type: 'update',
                   stream: 'notes',

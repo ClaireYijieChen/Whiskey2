@@ -41,7 +41,7 @@ class Whiskey2
       @refreshBookmarks () =>
         @refreshNotepads()
         @refreshTemplates()
-      @manager.start_ping (err, haveData) ->
+      @manager.start_ping (err, haveData) =>
         if haveData then @sync()
       @sync()
 
@@ -822,6 +822,20 @@ class Notepad
               return no
 
     loadNote = (note) =>
+      mergeNotes = (ids) =>
+        config = [type: 'findOne', id: note.id, stream: 'notes']
+        for id in ids
+          config.push type: 'findOne', id: id, stream: 'notes'
+        @app.manager.batch config, (err, arr) =>
+          if err then return @app.showError err
+          n = arr[0]
+          for i in [1...arr.length]
+            nn = arr[i]
+            if nn.text then n.text += '\n> '+nn.text
+          @app.manager.save 'notes', n, (err) =>
+            if err then return @app.showError err
+            @reloadSheets()
+
       div = $(document.createElement('div')).addClass('note').appendTo(parent)
       div.attr draggable: yes, id: 'note'+note.id
       div.bind 'click', (e) =>
@@ -841,19 +855,23 @@ class Notepad
           ids = []
           for id of @selectedNotes
             ids.push id
-          @app.dragSetType e, 'custom/note', {ids: ids, x: offset.left, y: offset.top}
+          @app.dragSetType e, 'custom/note', {ids: ids, x: offset.left, y: offset.top, append: e.shiftKey}
         else
-          @app.dragSetType e, 'custom/note', {id: note.id, x: offset.left, y: offset.top}
+          @app.dragSetType e, 'custom/note', {id: note.id, x: offset.left, y: offset.top, link: e.ctrlKey, append: e.shiftKey}
       div.bind 'dragover', (e) =>
         if (@app.dragHasType e, 'custom/note') or (@app.dragHasType e, 'Files')
           e.preventDefault()
       div.bind 'drop', (e) =>
         noteData = @app.dragGetType e, 'custom/note'
-        if noteData?.id
+        if noteData?.id and noteData?.link
           log 'Dropped note:', noteData
           if @createNoteLink note, noteData.id
             e.stopPropagation()
             return no
+        if noteData?.append
+          mergeNotes(if noteData.id then [noteData.id] else noteData.ids)
+          e.stopPropagation()
+          return no
         files = @app.dragGetType e, 'Files'
         if files and files.length > 0
           # Upload first file
@@ -976,7 +994,7 @@ class Notepad
   noteDefaultWidth: 1
   zoomFactor: 5
   colors: 8
-  gridStep: 6
+  gridStep: 3
   stick: yes
 
   loadSheet: (index, div) ->
@@ -1149,7 +1167,6 @@ class Notepad
               note.sheet_id = sheet.id
               note.x -= moveX
               note.y -= moveY
-              y+= @gridStep*2
               updates.push type: 'update', stream: 'notes', object: note
             @app.manager.batch updates, (err) =>
               if err then return @app.showError err
