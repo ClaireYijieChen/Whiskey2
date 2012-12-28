@@ -41,7 +41,7 @@ public class DataController {
 	private Integer[] colors = { R.drawable.note0, R.drawable.note1, R.drawable.note2, R.drawable.note3,
 			R.drawable.note4, R.drawable.note5, R.drawable.note6, R.drawable.note7 };
 	public static Integer[] widths = { 50, 75, 90, 120, 150 };
-	private int gridStep = 6;
+	private int gridStep = 3;
 	List<DataControllerListener> listeners = new ArrayList<DataController.DataControllerListener>();
 	Map<Long, List<BookmarkInfo>> bookmarks = new HashMap<Long, List<BookmarkInfo>>();
 	Map<Long, TemplateInfo> templates = new HashMap<Long, TemplateInfo>();

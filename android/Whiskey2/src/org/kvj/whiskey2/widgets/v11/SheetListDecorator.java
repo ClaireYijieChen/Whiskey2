@@ -6,6 +6,7 @@ import org.kvj.whiskey2.data.SheetInfo;
 import org.kvj.whiskey2.widgets.ListPageSelector;
 import org.kvj.whiskey2.widgets.adapters.BookmarksAdapter;
 import org.kvj.whiskey2.widgets.adapters.SheetsAdapter;
+import org.kvj.whiskey2.widgets.v11.NoteDnDDecorator.DragType;
 import org.kvj.whiskey2.widgets.v11.NoteDnDDecorator.NoteDnDInfo;
 
 import android.annotation.TargetApi;
@@ -64,6 +65,9 @@ public class SheetListDecorator {
 					sheetsAdapter.getSelector().notifyPageSelected(position, sheet.id);
 					if (event.getClipDescription().hasMimeType(NoteDnDDecorator.MIME_NOTE)) {
 						NoteDnDInfo dnDInfo = (NoteDnDInfo) event.getLocalState();
+						if (dnDInfo.dragType != DragType.Move) { // Not move
+							return false;
+						}
 						for (NoteInfo note : dnDInfo.notes) {
 							NoteInfo noteInfo = sheetsAdapter.getController().getNote(note.id);
 							if (null == noteInfo) {
@@ -73,12 +77,14 @@ public class SheetListDecorator {
 							noteInfo.sheetID = sheet.id;
 							sheetsAdapter.getController().saveNote(noteInfo);
 						}
+						sheetsAdapter.getSelector().collapseExpand(true);
 						sheetsAdapter.getController().notifyNoteChanged(null);
 						return true;
 					}
 					if (event.getClipDescription().hasMimeType(BookmarkDnDDecorator.MIME_BMARK)) {
 						if (sheetsAdapter.getController().moveBookmark(sheet, (BookmarkInfo) event.getLocalState())) {
 							// Bookmark moved
+							sheetsAdapter.getSelector().collapseExpand(true);
 							sheetsAdapter.getController().notifyDataChanged();
 						}
 						return true;
@@ -106,6 +112,12 @@ public class SheetListDecorator {
 					}
 					break;
 				case DragEvent.ACTION_DRAG_ENTERED:
+					if (event.getClipDescription().hasMimeType(NoteDnDDecorator.MIME_NOTE)) {
+						NoteDnDInfo dnDInfo = (NoteDnDInfo) event.getLocalState();
+						if (dnDInfo.dragType != DragType.Move) { // Not move
+							return true;
+						}
+					}
 					sheetSelector.collapseExpand(false);
 					return true;
 				}

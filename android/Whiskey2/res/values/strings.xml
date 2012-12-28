@@ -2,7 +2,8 @@
 <resources>
 
     <string name="app_name">Whiskey2</string>
-    <string name="hello_world">Hello world!</string>
     <string name="menu_settings">Settings</string>
-
+    <item name="tag_file_path" type="id"></item>
+    <item name="tag_expanded" type="id"></item>
+    
 </resources>

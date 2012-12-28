@@ -152,7 +152,8 @@ public class PageSurface extends View {
 							linkOK = false;
 						} else {
 							NoteInfo other = notes.get(index);
-							links.add(renderArrow(note, other, "#ffaaaa"));
+							links.add(renderArrow(note, other,
+									getContext().getResources().getColor(R.color.note_link_color)));
 						}
 						createLinkButton(note, linkID, toolbar, linkOK);
 					}
@@ -220,7 +221,7 @@ public class PageSurface extends View {
 		return toolbar;
 	}
 
-	private LinkInfo renderArrow(NoteInfo note1, NoteInfo note2, String color) {
+	private LinkInfo renderArrow(NoteInfo note1, NoteInfo note2, int color) {
 		float lineWidth = LINK_WIDTH / zoomFactor;
 		float gap = lineWidth;
 		float b1x = note1.widget.getLeft() - marginLeft - gap;
@@ -257,7 +258,7 @@ public class PageSurface extends View {
 		info.y1 = y1;
 		info.x2 = x0;
 		info.y2 = y0;
-		info.color = Color.parseColor(color);
+		info.color = color;
 		return info;
 	}
 

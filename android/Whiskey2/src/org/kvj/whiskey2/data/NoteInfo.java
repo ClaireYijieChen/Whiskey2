@@ -26,6 +26,7 @@ public class NoteInfo {
 	private PJSONObject original = null;
 	public LinearLayout linksToolbar = null;
 	public Map<String, String> fileCache = new HashMap<String, String>();
+	public int touchedPoints = 1;
 
 	public static NoteInfo fromJSON(PJSONObject obj) throws JSONException {
 		NoteInfo info = new NoteInfo();

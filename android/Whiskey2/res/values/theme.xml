@@ -26,4 +26,7 @@
 	<color name="notepad_default_color">#ff552222</color>
 	<color name="notepad_border_color">#ff000000</color>
 	<dimen name="notepad_border_size">2dp</dimen>
+	<color name="note_drop_target">#88dddddd</color>
+	<color name="note_link_color">#ffffaaaa</color>
+	<color name="note_merge_target_color">#ffaaaaff</color>
 </resources>

@@ -3,7 +3,7 @@
     <dimen name="list_item_height">25dp</dimen>
     <dimen name="bookmark_item_height">35dp</dimen>
     <dimen name="bookmark_item_width">30dp</dimen>
-    <dimen name="list_item_text">16dp</dimen>
+    <dimen name="list_item_text">18dp</dimen>
     <dimen name="list_item_padding">2dp</dimen>
     <dimen name="spinner_item_height">35dp</dimen>
     <dimen name="spinner_item_width">120dp</dimen>

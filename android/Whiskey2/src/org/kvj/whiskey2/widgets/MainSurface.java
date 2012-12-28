@@ -34,6 +34,7 @@ import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageButton;
@@ -66,6 +67,9 @@ public class MainSurface extends RelativeLayout {
 	private static final float SPIRAL_LEFT_GAP = 8;
 	private static final int SPIRAL_ITEM_HEIGHT = 9;
 	protected static final int COVER_MARGIN = 8;
+	private static final float MAX_TEXT_DPI = 20;
+	private static final int TAG_FILE_PATH = R.id.tag_file_path;
+	private static final int TAG_EXPANDED = R.id.tag_expanded;
 
 	private boolean layoutCreated = false;
 	private float density = 1;
@@ -99,10 +103,6 @@ public class MainSurface extends RelativeLayout {
 	@Override
 	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
 		super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-		// Log.i(TAG, "On measure: " + getMeasuredWidth() + "x" +
-		// getMeasuredHeight() + ", " + layoutCreated + ", " +
-		// parent.getMeasuredWidth() + "x" +
-		// parent.getMeasuredHeight());
 		if (width <= 0 || height <= 0) {
 			width = parent.getMeasuredWidth();
 			height = parent.getMeasuredHeight();
@@ -115,8 +115,6 @@ public class MainSurface extends RelativeLayout {
 	@Override
 	protected void onAttachedToWindow() {
 		super.onAttachedToWindow();
-		// Log.i(TAG, "attached to window - : " + getWidth() + ", " +
-		// getHeight());
 		parent = (ViewGroup) getParent();
 	}
 
@@ -150,16 +148,23 @@ public class MainSurface extends RelativeLayout {
 		int contentWidth = template.width;
 		int contentHeight = template.height;
 		float pageHeight = height - 2 * pageMargin;
-		float pageWidth = pageHeight * contentWidth / contentHeight + density * SPIRAL_RIGHT_WIDTH;
+		float pageWidth = contentWidth * pageHeight / contentHeight + density * SPIRAL_RIGHT_WIDTH;
 		if (pageWidth > width - 2 * pageMargin) {
 			// Too wide
 			pageWidth = width - 2 * pageMargin;
 			// Recalculate height
 			pageHeight = (pageWidth - density * SPIRAL_RIGHT_WIDTH) * contentHeight / contentWidth;
 		}
-		final float zoomFactor = contentHeight / pageHeight * zoom;
-		pageWidth /= zoom;
-		pageHeight /= zoom;
+		float _zoomFactor = (contentHeight / pageHeight);
+		float textDPI = TEXT_SIZE / _zoomFactor / density;
+		float maxZoomLimiter = 1f;
+		if (textDPI > MAX_TEXT_DPI) { // Non zoomed text is too big
+			maxZoomLimiter = textDPI / MAX_TEXT_DPI;
+		}
+		final float zoomFactor = _zoomFactor * zoom * maxZoomLimiter;
+		// Finally apply zoom
+		pageWidth /= zoom * maxZoomLimiter;
+		pageHeight /= zoom * maxZoomLimiter;
 		int minTemplateHeight = template.height;
 		SheetInfo otherSheet = adapter.getItem(index + 1);
 		if (null != otherSheet) { // Not empty
@@ -168,7 +173,7 @@ public class MainSurface extends RelativeLayout {
 			float otherTemplateHeight = otherTemplate.height / zoomFactor;
 			if (2 * pageMargin + template.width / zoomFactor + density * SPIRAL_CENTER_WIDTH + otherTemplateWidth < width) {
 				// Width is OK
-				if (2 * pageMargin + otherTemplateHeight < height) {
+				if (2 * pageMargin + otherTemplateHeight <= height) {
 					// Height is OK also
 					pageWidth = template.width / zoomFactor + density * SPIRAL_CENTER_WIDTH + otherTemplateWidth;
 					if (otherTemplate.height < minTemplateHeight) { // Smaller
@@ -263,10 +268,21 @@ public class MainSurface extends RelativeLayout {
 	}
 
 	private void renderPageItems(final PageSurface page, boolean leftToolbar) {
-		for (NoteInfo info : page.notes) { // Create textview's
+		for (final NoteInfo info : page.notes) { // Create textview's
 			View view = createNoteTextItem(page, info, leftToolbar);
 			info.widget = view;
 			decorateNoteView(view, info, page);
+			view.setOnTouchListener(new OnTouchListener() {
+
+				@Override
+				public boolean onTouch(View v, MotionEvent event) {
+					if (event.getAction() == MotionEvent.ACTION_DOWN) {
+						// Down - record finger count
+						info.touchedPoints = event.getPointerCount();
+					}
+					return false;
+				}
+			});
 		}
 		List<BookmarkInfo> bmarks = adapter.getController().getBookmarks(page.getSheetInfo().id);
 		if (null != bmarks) { // Have bookmarks -> create
@@ -400,22 +416,23 @@ public class MainSurface extends RelativeLayout {
 	public void acceptDrop(PageSurface page, SheetInfo sheet, float x, float y, NoteDnDInfo dnDInfo) {
 		// Log.i(TAG, "Accept drop: " + x + "x" + y + ", " + notes);
 
-		NoteInfo droppingNote = dnDInfo.notes.get(0);
-		// First check if we dropped on page
-		float dropX = page.marginLeft + x;
-		float dropY = page.marginTop + y;
-		for (NoteInfo note : page.notes) {
-			// Iterate and check coordinates
-			if (note.widget.getLeft() < dropX && dropX < note.widget.getRight() && note.widget.getTop() < dropY
-					&& dropY < note.widget.getBottom()) { // Within bounds
-				if (adapter.getController().createLink(droppingNote, note)) {
-					// Created link
-					adapter.getController().notifyNoteChanged(note);
-					return;
-				}
-			}
-		}
-
+		// NoteInfo droppingNote = dnDInfo.notes.get(0);
+		// // First check if we dropped on page
+		// float dropX = page.marginLeft + x;
+		// float dropY = page.marginTop + y;
+		// for (NoteInfo note : page.notes) {
+		// // Iterate and check coordinates
+		// if (note.widget.getLeft() < dropX && dropX < note.widget.getRight()
+		// && note.widget.getTop() < dropY
+		// && dropY < note.widget.getBottom()) { // Within bounds
+		// if (adapter.getController().createLink(droppingNote, note)) {
+		// // Created link
+		// adapter.getController().notifyNoteChanged(note);
+		// return;
+		// }
+		// }
+		// }
+		//
 		int noteX = adapter.getController().stickToGrid((x - dnDInfo.leftFix) * page.zoomFactor);
 		int noteY = adapter.getController().stickToGrid((y - dnDInfo.topFix) * page.zoomFactor);
 
@@ -473,14 +490,65 @@ public class MainSurface extends RelativeLayout {
 		return null;
 	}
 
+	private void setImage(NoteInfo info, PageSurface page, String filePath, View parent, ImageView image) {
+		final int margin = (int) (ICON_MARGIN / page.zoomFactor);
+		boolean expanded = (Boolean) image.getTag(TAG_EXPANDED);
+		final int width = expanded ? info.width - IMAGE_MARGIN : ICON_SIZE;
+		int w = (int) (width / page.zoomFactor);
+		image.setVisibility(VISIBLE);
+		LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(w, w);
+		image.setLayoutParams(params);
+		if (!"".equals(filePath)) { //
+			File f = new File(filePath);
+			Point size = getBitmapSize(f);
+			if (null == size) {
+				return;
+			}
+			float mul = (expanded ? size.x : Math.max(size.x, size.y)) / width;
+			Bitmap b = decodeFile(f, (int) (width / page.zoomFactor));
+			if (null == b) {
+				return;
+			}
+			w = (int) (size.x / mul / page.zoomFactor);
+			int h = (int) (size.y / mul / page.zoomFactor);
+			params = new LinearLayout.LayoutParams(w, h);
+			if (expanded) {
+				params.bottomMargin = margin;
+				params.gravity = Gravity.CENTER_HORIZONTAL;
+			} else {
+				params.rightMargin = margin;
+				params.gravity = Gravity.LEFT;
+			}
+			image.setImageBitmap(b);
+			image.setLayoutParams(params);
+		}
+	}
+
 	private void createFiles(final PageSurface page, final NoteInfo info, final boolean expanded, ViewGroup root) {
 		if (null == info.files || 0 == info.files.length()) {
 			return;
 		}
 		final int margin = (int) (ICON_MARGIN / page.zoomFactor);
-		LinearLayout panel = (LinearLayout) root.findViewById(R.id.one_note_files);
-		panel.removeAllViews();
+		final LinearLayout panel = (LinearLayout) root.findViewById(R.id.one_note_files);
 		panel.setOrientation(expanded ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
+		if (panel.getChildCount() == info.files.length()) {
+			// Already created - change size
+			for (int i = 0; i < info.files.length(); i++) {
+				final String file = info.files.optString(i, "");
+				View child = panel.getChildAt(i);
+				if (file.endsWith(".jpg")) {
+					String filePath = (String) child.getTag(TAG_FILE_PATH);
+					// File - change size
+					child.setTag(TAG_EXPANDED, expanded);
+					if (null != filePath) { // Already loaded
+						setImage(info, page, filePath, panel, (ImageView) child);
+					}
+				}
+			}
+			return;
+		}
+
+		panel.removeAllViews();
 		for (int i = 0; i < info.files.length(); i++) {
 			final String file = info.files.optString(i, "");
 			final int index = i;
@@ -492,6 +560,7 @@ public class MainSurface extends RelativeLayout {
 				params.rightMargin = margin;
 				final ImageView view = (ImageView) inflater.inflate(R.layout.one_note_image, panel, false);
 				child = view;
+				view.setTag(TAG_EXPANDED, expanded);
 				AsyncTask<Void, Void, String> task = new AsyncTask<Void, Void, String>() {
 
 					@Override
@@ -501,33 +570,14 @@ public class MainSurface extends RelativeLayout {
 
 					@Override
 					protected void onPostExecute(String result) {
-						if (null == result) {
-							return;
+						if (null == result) { // Download failed
+							result = "";
 						}
-						File f = new File(result);
-						Point size = getBitmapSize(f);
-						if (null == size) {
-							return;
-						}
-						float mul = (expanded ? size.x : Math.max(size.x, size.y)) / width;
-						Bitmap b = decodeFile(f, (int) (width / page.zoomFactor));
-						if (null == b) {
-							return;
-						}
-						int w = (int) (size.x / mul / page.zoomFactor);
-						int h = (int) (size.y / mul / page.zoomFactor);
-						LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(w, h);
-						if (expanded) {
-							params.bottomMargin = margin;
-							params.gravity = Gravity.CENTER_HORIZONTAL;
-						} else {
-							params.rightMargin = margin;
-							params.gravity = Gravity.LEFT;
-						}
-						view.setLayoutParams(params);
-						view.setImageBitmap(b);
+						view.setTag(TAG_FILE_PATH, result);
+						setImage(info, page, result, panel, view);
 					}
 				};
+				view.setVisibility(GONE);
 				panel.addView(view, params);
 				task.execute();
 			} else {
@@ -638,7 +688,12 @@ public class MainSurface extends RelativeLayout {
 				// Log.i(TAG, "Focus changed: " + info.id + ", " + hasFocus);
 				createFiles(page, info, hasFocus, root);
 				if (null != info.linksToolbar) { // Have links toolbar
-					info.linksToolbar.setVisibility(hasFocus ? View.VISIBLE : View.GONE);
+					if (hasFocus) { // Show and rais links toolbar
+						info.linksToolbar.setVisibility(View.VISIBLE);
+						info.linksToolbar.bringToFront();
+					} else { // Hide links
+						info.linksToolbar.setVisibility(View.GONE);
+					}
 				}
 				if (hasFocus) { // Bring to front first
 					root.bringToFront();
@@ -646,13 +701,14 @@ public class MainSurface extends RelativeLayout {
 							RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
 					toolbarParams.addRule(RelativeLayout.ALIGN_TOP, root.getId());
 					if (leftToolbar) { // Show toolbar to left
-						toolbarParams.addRule(RelativeLayout.LEFT_OF, root.getId());
+						// TODO: Fix position of toolbar for second page
+						toolbarParams.addRule(RelativeLayout.RIGHT_OF, root.getId());
 					} else {
 						toolbarParams.addRule(RelativeLayout.RIGHT_OF, root.getId());
 					}
 					toolbar.setVisibility(VISIBLE);
-					toolbar.bringToFront();
 					toolbar.setLayoutParams(toolbarParams);
+					toolbar.bringToFront();
 					currentNote = info;
 				}
 				if (info.collapsible && !hasFocus) { // Change state
