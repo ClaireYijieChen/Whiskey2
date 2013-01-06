@@ -1179,6 +1179,7 @@
         progress_handler(_this.SYNC_READ_DATA);
         return _this.db.query('select id, name, status from uploads order by id limit 1', [], function(err, data) {
           var remove_entry, row;
+          log('Upload:', data);
           if (err) {
             return finish_sync(err);
           }

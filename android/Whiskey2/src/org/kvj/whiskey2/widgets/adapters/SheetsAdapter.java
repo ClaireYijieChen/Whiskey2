@@ -200,10 +200,10 @@ public class SheetsAdapter implements ListAdapter {
 		}
 	}
 
-	public void refreshVisiblePages() {
+	public void refreshVisiblePages(boolean layoutChanged) {
 		synchronized (activeFragments) { // Lock
 			for (PagerItemFragment fragment : activeFragments) { // Refresh
-				fragment.refresh();
+				fragment.refresh(layoutChanged);
 			}
 		}
 	}

@@ -780,6 +780,7 @@ class StorageProvider
         return send_in null
       progress_handler @SYNC_READ_DATA
       @db.query 'select id, name, status from uploads order by id limit 1', [], (err, data) =>
+        log 'Upload:', data
         if err then return finish_sync err
         if data.length is 0 then return send_in null
         row = data[0]

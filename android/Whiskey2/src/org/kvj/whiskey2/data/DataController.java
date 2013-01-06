@@ -4,11 +4,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.kvj.bravo7.SuperActivity;
 import org.kvj.bravo7.ipc.RemoteServiceConnector;
 import org.kvj.lima1.sync.PJSONObject;
 import org.kvj.lima1.sync.QueryOperator;
@@ -18,9 +20,13 @@ import org.kvj.whiskey2.R;
 import org.kvj.whiskey2.Whiskey2App;
 import org.kvj.whiskey2.data.template.DrawTemplate;
 
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.IBinder;
 import android.os.RemoteException;
+import android.text.TextUtils;
 import android.util.Log;
 
 public class DataController {
@@ -29,11 +35,12 @@ public class DataController {
 
 		public void dataChanged();
 
-		public void noteChanged(NoteInfo info);
+		public void noteChanged(NoteInfo info, boolean layoutChanged);
 	}
 
 	private static final String TAG = "DataController";
 	private static final int REMOTE_WAIT_SECONDS = 30;
+	protected static final String APP_NAME = "whiskey2";
 	private Whiskey2App app = null;
 	RemoteServiceConnector<SyncService> connector = null;
 	private TemplateInfo defaultTemplate = new TemplateInfo();
@@ -46,11 +53,35 @@ public class DataController {
 	Map<Long, List<BookmarkInfo>> bookmarks = new HashMap<Long, List<BookmarkInfo>>();
 	Map<Long, TemplateInfo> templates = new HashMap<Long, TemplateInfo>();
 	DrawTemplate drawTemplate = null;
+	protected String lastToken = null;
+
+	BroadcastReceiver syncDone = new BroadcastReceiver() {
+
+		@Override
+		public void onReceive(Context context, Intent intent) {
+			String appName = intent.getStringExtra(SyncServiceInfo.KEY_APP);
+			if (!APP_NAME.equals(appName)) { // Skip
+				return;
+			}
+			String result = intent.getStringExtra(SyncServiceInfo.KEY_RESULT);
+			String token = intent.getStringExtra(SyncServiceInfo.KEY_TOKEN);
+			if (null == result) { // Done
+				SuperActivity.notifyUser(context, "Sync done");
+				afterSync();
+				if (token.equals(lastToken)) { // Expected
+					notifyDataChanged();
+				}
+			} else {
+				SuperActivity.notifyUser(context, result);
+			}
+		}
+	};
 
 	public DataController(Whiskey2App whiskey2App) {
 		this.app = whiskey2App;
 		drawTemplate = new DrawTemplate(this);
 		startConnector();
+		app.registerReceiver(syncDone, new IntentFilter(SyncServiceInfo.SYNC_FINISH_INTENT));
 	}
 
 	private void startConnector() {
@@ -58,7 +89,7 @@ public class DataController {
 
 			@Override
 			protected void onBeforeConnect(Intent intent) {
-				intent.putExtra("application", "whiskey2");
+				intent.putExtra("application", APP_NAME);
 			}
 
 			@Override
@@ -133,8 +164,8 @@ public class DataController {
 			return;
 		}
 		synchronized (templates) { // Lock templates
-			try { //
-				PJSONObject[] list = svc.query("templates", new QueryOperator[0], null, null);
+			try {
+				PJSONObject[] list = svc.query("templates", new QueryOperator[0], "tag, name", null);
 				templates.clear();
 				for (PJSONObject obj : list) { // Fill structure
 					TemplateInfo info = TemplateInfo.fromJSON(obj);
@@ -146,17 +177,22 @@ public class DataController {
 		}
 	}
 
+	private void afterSync() {
+		refreshBookmarks();
+		refreshTemplates();
+	}
+
 	public String sync() {
 		if (null == getRemote()) { // No connection
 			return "No connection";
 		}
 		try {
-			String result = getRemote().sync();
-			if (null == result) { // Refresh bookmarks
-				refreshBookmarks();
-				refreshTemplates();
+			String id = getRemote().sync();
+			if (null == id) { // Error
+				return "Sync error";
 			}
-			return result;
+			lastToken = id;
+			return null;
 		} catch (RemoteException e) {
 			Log.e(TAG, "Error syncing:", e);
 			return "Application error";
@@ -325,10 +361,10 @@ public class DataController {
 		return widths;
 	}
 
-	public void notifyNoteChanged(NoteInfo note) {
+	public void notifyNoteChanged(NoteInfo note, boolean layoutChanged) {
 		synchronized (listeners) { // Lock for modifications
 			for (DataControllerListener l : listeners) { // Notify
-				l.noteChanged(note);
+				l.noteChanged(note, layoutChanged);
 			}
 		}
 
@@ -544,5 +580,125 @@ public class DataController {
 
 	public DrawTemplate getDrawTemplate() {
 		return drawTemplate;
+	}
+
+	public List<TemplateGroup> getTemplates() {
+		Map<String, TemplateGroup> map = new LinkedHashMap<String, TemplateGroup>();
+		TemplateGroup empty = new TemplateGroup();
+		empty.title = "No tag";
+		for (TemplateInfo info : templates.values()) { // Collect tags
+			if (TextUtils.isEmpty(info.tag)) { // Have Tag
+				empty.templates.add(info);
+			} else { // Not empty
+				TemplateGroup group = map.get(info.tag.toLowerCase());
+				if (null == group) { // Create
+					group = new TemplateGroup();
+					group.title = info.tag;
+					map.put(info.tag.toLowerCase(), group);
+				}
+				group.templates.add(info);
+			}
+		}
+		map.put(null, empty);
+		empty.templates.add(defaultTemplate);
+		List<TemplateGroup> result = new ArrayList<TemplateGroup>();
+		result.addAll(map.values());
+		return result;
+	}
+
+	/**
+	 * Get sheets; create new sheet, update last sheet, set next_id to new sheet
+	 * 
+	 * @param title
+	 * @param template
+	 * @param notebook
+	 * @return
+	 */
+	public SheetInfo newSheet(String title, long template, long notebook) {
+		List<SheetInfo> sheets = getSheets(notebook);
+		SyncService svc = getRemote();
+		if (null == svc) { // No connection
+			Log.w(TAG, "No service");
+			return null;
+		}
+		try {
+			PJSONObject newSheet = new PJSONObject();
+			newSheet.put("title", title);
+			newSheet.put("notepad_id", notebook);
+			if (template > 0) { // Have template
+				newSheet.put("template_id", template);
+			}
+			newSheet = svc.create("sheets", newSheet);
+			if (null == newSheet) { // Error
+				Log.e(TAG, "Sheet not created");
+				return null;
+			}
+			SheetInfo info = SheetInfo.fromPJSON(newSheet);
+			if (sheets.size() > 0) { // Have sheets
+				SheetInfo last = sheets.get(sheets.size() - 1);
+				last.origin.put("next_id", info.id);
+				svc.update("sheets", last.origin);
+			}
+			return info;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+
+	public boolean updateSheet(long id, String title, long template) {
+		SyncService svc = getRemote();
+		if (null == svc) { // No connection
+			Log.w(TAG, "No service");
+			return false;
+		}
+		try {
+			PJSONObject sheet = findOne("sheets", id);
+			if (null == sheet) { // Not found
+				Log.w(TAG, "Sheet not found");
+				return false;
+			}
+			sheet.put("title", title);
+			if (template > 0) { // Have template
+				sheet.put("template_id", template);
+			} else {
+				if (sheet.has("template_id")) { // Reset
+					sheet.remove("template_id");
+				}
+			}
+			sheet = svc.update("sheets", sheet);
+			if (null == sheet) { // Error
+				Log.e(TAG, "Sheet not updated");
+				return false;
+			}
+			return true;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return false;
+	}
+
+	public boolean removeSheet(long id) {
+		SyncService svc = getRemote();
+		if (null == svc) { // No connection
+			Log.w(TAG, "No service");
+			return false;
+		}
+		try {
+			PJSONObject sheet = findOne("sheets", id);
+			if (null == sheet) { // Not found
+				Log.w(TAG, "Sheet not found");
+				return true;
+			}
+			sheet = svc.removeCascade("sheets", sheet);
+			if (null == sheet) { // Error
+				Log.e(TAG, "Sheet not removed");
+				return false;
+			}
+			return true;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return false;
 	}
 }

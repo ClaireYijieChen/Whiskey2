@@ -21,14 +21,50 @@
     <LinearLayout
         android:id="@+id/notepad_main_zoom"
         android:layout_width="wrap_content"
-        android:layout_height="40dp"
+        android:layout_height="@dimen/zoom_toolbar_size"
         android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true"
         android:layout_marginBottom="10dp"
         android:background="@color/float_toolbar_bg">
         <ImageButton
+            android:id="@+id/notepad_main_zoom_fit_page"
+            android:layout_width="@dimen/zoom_toolbar_size"
+            android:layout_height="match_parent"
+            android:layout_margin="0dp"
+            android:background="@drawable/float_button_bg"
+            android:padding="4dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/zoom_fit_page"/>
+        <ImageButton
+            android:id="@+id/notepad_main_zoom_fit_width"
+            android:layout_width="@dimen/zoom_toolbar_size"
+            android:layout_height="match_parent"
+            android:layout_margin="0dp"
+            android:background="@drawable/float_button_bg"
+            android:padding="4dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/zoom_fit_width"/>
+        <ImageButton
+            android:id="@+id/notepad_main_zoom_best_fit"
+            android:layout_width="@dimen/zoom_toolbar_size"
+            android:layout_height="match_parent"
+            android:layout_margin="0dp"
+            android:background="@drawable/float_button_bg"
+            android:padding="4dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/zoom_best_fit"/>
+        <ImageButton
             android:id="@+id/notepad_main_zoom_in"
-            android:layout_width="40dp"
+            android:layout_width="@dimen/zoom_toolbar_size"
+            android:layout_height="match_parent"
+            android:layout_margin="0dp"
+            android:background="@drawable/float_button_bg"
+            android:padding="4dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/zoom_out"/>
+        <ImageButton
+            android:id="@+id/notepad_main_zoom_out"
+            android:layout_width="@dimen/zoom_toolbar_size"
             android:layout_height="match_parent"
             android:layout_margin="0dp"
             android:background="@drawable/float_button_bg"
@@ -36,25 +72,13 @@
             android:scaleType="centerCrop"
             android:src="@drawable/zoom_in"/>
         <ImageButton
-            android:id="@+id/notepad_main_zoom_out"
-            android:layout_width="40dp"
-            android:layout_height="match_parent"
-            android:layout_margin="0dp"
-            android:background="@drawable/float_button_bg"
-            android:padding="4dp"
-            android:scaleType="centerCrop"
-            android:src="@drawable/zoom_out"/>
-        <ToggleButton
             android:id="@+id/notepad_main_zoom_lock"
-            android:layout_width="40dp"
+            android:layout_width="@dimen/zoom_toolbar_size"
             android:layout_height="match_parent"
             android:layout_margin="0dp"
             android:background="@drawable/float_button_bg"
             android:padding="4dp"
             android:scaleType="centerCrop"
-            android:src="@drawable/zoom_lock"
-            android:textColor="#ffffff"
-            android:textOff="OFF"
-            android:textOn="ON"/>
+            android:src="@drawable/zoom_lock"/>
     </LinearLayout>
 </RelativeLayout>

@@ -139,18 +139,25 @@ public class EditorDialogFragment extends SherlockDialogFragment {
 	}
 
 	protected void onRemoveClick() {
-		NoteInfo info = controller.getNote(formController.getValue(KEY_ID, Long.class));
+		final NoteInfo info = controller.getNote(formController.getValue(KEY_ID, Long.class));
 		if (null == info) { // Not found
 			SuperActivity.notifyUser(getActivity(), "Note not found");
 			return;
 		}
-		if (controller.removeNote(info)) { // Removed
-			dismiss();
-			controller.notifyNoteChanged(info);
-		} else {
-			SuperActivity.notifyUser(getActivity(), "Error removing note");
-			return;
-		}
+		SuperActivity.showQuestionDialog(getActivity(), "Remove note?",
+				"Are you sure want to remove note?", new Runnable() {
+
+					@Override
+					public void run() {
+						if (controller.removeNote(info)) { // Removed
+							dismiss();
+							controller.notifyNoteChanged(info, false);
+						} else {
+							SuperActivity.notifyUser(getActivity(), "Error removing note");
+							return;
+						}
+					}
+				});
 	}
 
 	protected void onSaveClick() {
@@ -183,7 +190,7 @@ public class EditorDialogFragment extends SherlockDialogFragment {
 		info.text = text;
 		if (controller.saveNote(info)) { // Saved
 			dismiss();
-			controller.notifyNoteChanged(info);
+			controller.notifyNoteChanged(info, false);
 		} else {
 			SuperActivity.notifyUser(getActivity(), "Error saving note");
 			return;

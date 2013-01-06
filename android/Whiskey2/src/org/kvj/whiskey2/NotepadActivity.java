@@ -14,10 +14,12 @@ import org.kvj.whiskey2.data.SheetInfo;
 import org.kvj.whiskey2.svc.DataService;
 import org.kvj.whiskey2.widgets.ListPageSelector;
 import org.kvj.whiskey2.widgets.ListPageSelector.PagesSelectorListener;
+import org.kvj.whiskey2.widgets.SheetDialogFragment;
 import org.kvj.whiskey2.widgets.adapters.BookmarksAdapter;
 import org.kvj.whiskey2.widgets.adapters.NotebookListAdapter;
 import org.kvj.whiskey2.widgets.adapters.NotebookListAdapter.NotebookInfo;
 import org.kvj.whiskey2.widgets.adapters.PagesPagerAdapter;
+import org.kvj.whiskey2.widgets.v11.NoteDnDDecorator;
 import org.kvj.whiskey2.widgets.v11.SheetListDecorator;
 
 import android.content.Intent;
@@ -25,10 +27,10 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v4.view.ViewPager;
 import android.support.v4.view.ViewPager.OnPageChangeListener;
-import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
+import android.widget.LinearLayout;
 import android.widget.ListView;
 
 import com.actionbarsherlock.app.ActionBar;
@@ -56,6 +58,8 @@ public class NotepadActivity extends SherlockFragmentActivity implements Control
 	TransientAdapter<Long> sheetID = null;
 	protected int notepadPosition = -1;
 	protected PagesPagerAdapter pagerAdapter = null;
+	private boolean fullscreen = false;
+	LinearLayout dndTargets = null;
 
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
@@ -79,9 +83,47 @@ public class NotepadActivity extends SherlockFragmentActivity implements Control
 		case R.id.menu_reload: // Reload selected notepad
 			refreshNotepad();
 			break;
+		case R.id.menu_fullscreen: // Make fullscreen
+			toggleFullscreen();
+			break;
+		case R.id.menu_add_sheet:
+			startAddSheet();
+			break;
+		case R.id.menu_edit_sheet:
+			startEditSheet();
+			break;
 		}
 
 		return true;
+	}
+
+	private void startEditSheet() {
+		int selected = pager.getCurrentItem();
+		if (selected >= 0 && selected < sheetSelector.getCount()) {
+			// Have page selected
+			SheetDialogFragment fragment = SheetDialogFragment.newInstance(sheetSelector.adapter.getItem(selected),
+					notepadID.getWidgetValue());
+			fragment.show(getSupportFragmentManager(), "editor");
+		} else {
+			SuperActivity.notifyUser(this, "Sheet not selected");
+		}
+	}
+
+	private void startAddSheet() {
+		SheetDialogFragment fragment = SheetDialogFragment.newInstance(new SheetInfo(), notepadID.getWidgetValue());
+		fragment.show(getSupportFragmentManager(), "editor");
+	}
+
+	void toggleFullscreen() {
+		if (fullscreen) { // Show
+			getSupportActionBar().show();
+			bookmarkSelector.setVisibility(View.VISIBLE);
+		} else { // Hide
+			getSupportActionBar().hide();
+			bookmarkSelector.setVisibility(View.GONE);
+		}
+		fullscreen = !fullscreen;
+		noteChanged(null, true);
 	}
 
 	private void selectPage(int position, boolean animate) {
@@ -104,7 +146,7 @@ public class NotepadActivity extends SherlockFragmentActivity implements Control
 		form.load(this, savedInstanceState);
 		pager.setSaveEnabled(false);
 		sheetSelector = (ListPageSelector) findViewById(R.id.notepad_sheets);
-
+		sheetSelector.setPager(pager);
 		sheetSelector.addListener(new PagesSelectorListener() {
 
 			@Override
@@ -170,6 +212,14 @@ public class NotepadActivity extends SherlockFragmentActivity implements Control
 			}
 		});
 		decorateBookmarkSelector();
+		dndTargets = (LinearLayout) findViewById(R.id.notepad_dnd_targets);
+		decorateDndTargets();
+	}
+
+	private void decorateDndTargets() {
+		if (android.os.Build.VERSION.SDK_INT >= 11) {
+			NoteDnDDecorator.decorateDndTargets(pager, dndTargets);
+		}
 	}
 
 	private void decorateBookmarkSelector() {
@@ -207,8 +257,6 @@ public class NotepadActivity extends SherlockFragmentActivity implements Control
 					SuperActivity.notifyUser(getApplicationContext(), result);
 					return;
 				}
-				SuperActivity.notifyUser(getApplicationContext(), "Done");
-				refresh();
 			}
 
 		};
@@ -304,13 +352,17 @@ public class NotepadActivity extends SherlockFragmentActivity implements Control
 			public void run() {
 				// New pagerAdapter
 				refreshSheets();
+				dndTargets.setVisibility(View.INVISIBLE);
 			}
 		});
 	}
 
 	@Override
 	public void onBackPressed() {
-		Log.i(TAG, "Collapsed: " + sheetSelector.collapsed);
+		if (fullscreen) { // In fullscreen - exit
+			toggleFullscreen();
+			return;
+		}
 		if (sheetSelector.collapsed) { // Expand
 			sheetSelector.collapseExpand(false);
 			return;
@@ -326,12 +378,12 @@ public class NotepadActivity extends SherlockFragmentActivity implements Control
 
 	@Override
 	public void dataChanged() {
-		refreshNotepad();
+		refresh();
 	}
 
 	@Override
-	public void noteChanged(NoteInfo info) {
-		sheetSelector.adapter.refreshVisiblePages();
+	public void noteChanged(NoteInfo info, boolean layoutChanged) {
+		sheetSelector.adapter.refreshVisiblePages(layoutChanged);
 	}
 
 }

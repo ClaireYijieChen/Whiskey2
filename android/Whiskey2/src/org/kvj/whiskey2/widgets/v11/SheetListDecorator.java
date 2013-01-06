@@ -1,5 +1,6 @@
 package org.kvj.whiskey2.widgets.v11;
 
+import org.kvj.whiskey2.R;
 import org.kvj.whiskey2.data.BookmarkInfo;
 import org.kvj.whiskey2.data.NoteInfo;
 import org.kvj.whiskey2.data.SheetInfo;
@@ -9,7 +10,9 @@ import org.kvj.whiskey2.widgets.adapters.SheetsAdapter;
 import org.kvj.whiskey2.widgets.v11.NoteDnDDecorator.DragType;
 import org.kvj.whiskey2.widgets.v11.NoteDnDDecorator.NoteDnDInfo;
 
+import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
+import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.util.Log;
 import android.view.DragEvent;
@@ -45,12 +48,21 @@ public class SheetListDecorator {
 		});
 	}
 
-	public static void decorateItem(final SheetsAdapter sheetsAdapter, View view, final int position) {
+	@SuppressLint("NewApi")
+	public static void decorateItem(final SheetsAdapter sheetsAdapter, final View view, final int position) {
+		final Drawable normalBackground = view.getContext().getResources()
+				.getDrawable(android.R.drawable.list_selector_background);
 		view.setOnDragListener(new OnDragListener() {
 
 			@Override
 			public boolean onDrag(View v, DragEvent event) {
 				switch (event.getAction()) {
+				case DragEvent.ACTION_DRAG_ENTERED:
+					view.setBackgroundResource(R.drawable.sheet_item_dnd_target);
+					break;
+				case DragEvent.ACTION_DRAG_EXITED:
+					view.setBackground(normalBackground);
+					break;
 				case DragEvent.ACTION_DRAG_STARTED:
 					// Log.i(TAG, "Drag start: " + position);
 					if (event.getClipDescription().hasMimeType(NoteDnDDecorator.MIME_NOTE)) {
@@ -78,7 +90,7 @@ public class SheetListDecorator {
 							sheetsAdapter.getController().saveNote(noteInfo);
 						}
 						sheetsAdapter.getSelector().collapseExpand(true);
-						sheetsAdapter.getController().notifyNoteChanged(null);
+						sheetsAdapter.getController().notifyNoteChanged(null, false);
 						return true;
 					}
 					if (event.getClipDescription().hasMimeType(BookmarkDnDDecorator.MIME_BMARK)) {

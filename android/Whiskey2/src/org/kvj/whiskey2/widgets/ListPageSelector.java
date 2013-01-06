@@ -3,6 +3,7 @@ package org.kvj.whiskey2.widgets;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.kvj.whiskey2.R;
 import org.kvj.whiskey2.data.DataController;
 import org.kvj.whiskey2.widgets.adapters.SheetsAdapter;
 import org.kvj.whiskey2.widgets.v11.SheetListDecorator;
@@ -10,6 +11,11 @@ import org.kvj.whiskey2.widgets.v11.SheetListDecorator;
 import android.content.Context;
 import android.util.AttributeSet;
 import android.view.View;
+import android.view.animation.AccelerateInterpolator;
+import android.view.animation.AlphaAnimation;
+import android.view.animation.Animation;
+import android.view.animation.AnimationSet;
+import android.view.animation.TranslateAnimation;
 import android.widget.AdapterView;
 import android.widget.ListView;
 
@@ -31,8 +37,21 @@ public class ListPageSelector extends ListView {
 
 	private DataController controller = null;
 
+	private int listWidth = 0;
+	View pager = null;
+
+	private AnimationSet listShowAnimation = null;
+
 	public ListPageSelector(Context context, AttributeSet attrs) {
 		super(context, attrs);
+		listShowAnimation = new AnimationSet(true);
+		Animation transform = new TranslateAnimation(-context.getResources().getDimensionPixelSize(
+				R.dimen.sheets_list_width), 0, 0, 0);
+		listShowAnimation.setDuration(150);
+		listShowAnimation.setInterpolator(new AccelerateInterpolator(1f));
+		AlphaAnimation alpha = new AlphaAnimation(0f, 1f);
+		listShowAnimation.addAnimation(transform);
+		listShowAnimation.addAnimation(alpha);
 		adapter = new SheetsAdapter(this);
 		setOnItemClickListener(new OnItemClickListener() {
 
@@ -45,6 +64,10 @@ public class ListPageSelector extends ListView {
 		decorate(this);
 	}
 
+	public void setPager(View pager) {
+		this.pager = pager;
+	}
+
 	private void decorate(ListPageSelector listPageSelector) {
 		if (android.os.Build.VERSION.SDK_INT >= 11) {
 			SheetListDecorator.decorate(listPageSelector);
@@ -55,6 +78,7 @@ public class ListPageSelector extends ListView {
 	protected void onAttachedToWindow() {
 		super.onAttachedToWindow();
 		density = getContext().getResources().getDisplayMetrics().density;
+		listWidth = getContext().getResources().getDimensionPixelSize(R.dimen.sheets_list_width);
 	}
 
 	// @Override
@@ -75,12 +99,19 @@ public class ListPageSelector extends ListView {
 			return;
 		}
 		collapsed = collapse;
+		// RelativeLayout.LayoutParams params = (RelativeLayout.LayoutParams)
+		// pager.getLayoutParams();
 		if (collapse) { // Collapse
-			setVisibility(GONE);
+			// params.leftMargin = 0;
+			clearAnimation();
+			pager.bringToFront();
 		} else {
-			setVisibility(VISIBLE);
+			// params.leftMargin = listWidth;
+			startAnimation(listShowAnimation);
 			requestFocus();
+			bringToFront();
 		}
+		// pager.setLayoutParams(params);
 	}
 
 	public void addListener(PagesSelectorListener listener) {

@@ -70,6 +70,10 @@ public class MainSurface extends RelativeLayout {
 	private static final float MAX_TEXT_DPI = 20;
 	private static final int TAG_FILE_PATH = R.id.tag_file_path;
 	private static final int TAG_EXPANDED = R.id.tag_expanded;
+	protected static final float ZOOM_BEST_FIT = -1;
+	protected static final float ZOOM_FIT_PAGE = -2;
+	protected static final float ZOOM_FIT_WIDTH = -3;
+	private static final float BEST_FIT_DPI = 16;
 
 	private boolean layoutCreated = false;
 	private float density = 1;
@@ -86,6 +90,7 @@ public class MainSurface extends RelativeLayout {
 	private int width = 0;
 	private int height = 0;
 	private OnPageZoomListener pageZoomListener = null;
+	private boolean forceLayout = false;
 
 	public MainSurface(Context context, AttributeSet attrs) {
 		super(context, attrs);
@@ -108,7 +113,7 @@ public class MainSurface extends RelativeLayout {
 			height = parent.getMeasuredHeight();
 		}
 		if (!layoutCreated && width > 0 && height > 0) {
-			createLayout();
+			createLayout(false);
 		}
 	}
 
@@ -123,7 +128,7 @@ public class MainSurface extends RelativeLayout {
 			@Override
 			public boolean removeLink(NoteInfo note, long linkID) {
 				if (adapter.getController().removeLink(note, linkID)) {
-					adapter.getController().notifyNoteChanged(note);
+					adapter.getController().notifyNoteChanged(note, false);
 					return true;
 				}
 				return false;
@@ -138,6 +143,8 @@ public class MainSurface extends RelativeLayout {
 	}
 
 	private boolean render() {
+		layoutCreated = true;
+		currentNote = null;
 		SheetInfo sheet = adapter.getItem(index);
 		if (null == sheet) { // Invalid sheet - nothing to show
 			return false;
@@ -149,7 +156,7 @@ public class MainSurface extends RelativeLayout {
 		int contentHeight = template.height;
 		float pageHeight = height - 2 * pageMargin;
 		float pageWidth = contentWidth * pageHeight / contentHeight + density * SPIRAL_RIGHT_WIDTH;
-		if (pageWidth > width - 2 * pageMargin) {
+		if (pageWidth > width - 2 * pageMargin || zoom == ZOOM_FIT_WIDTH) {
 			// Too wide
 			pageWidth = width - 2 * pageMargin;
 			// Recalculate height
@@ -160,6 +167,14 @@ public class MainSurface extends RelativeLayout {
 		float maxZoomLimiter = 1f;
 		if (textDPI > MAX_TEXT_DPI) { // Non zoomed text is too big
 			maxZoomLimiter = textDPI / MAX_TEXT_DPI;
+		}
+		if (zoom == ZOOM_FIT_WIDTH || zoom == ZOOM_FIT_PAGE) {
+			// No zoom/fix zoom
+			zoom = 1f;
+			maxZoomLimiter = 1f;
+		}
+		if (zoom == ZOOM_BEST_FIT) { // Fix text DPI
+			zoom = textDPI / BEST_FIT_DPI;
 		}
 		final float zoomFactor = _zoomFactor * zoom * maxZoomLimiter;
 		// Finally apply zoom
@@ -313,7 +328,6 @@ public class MainSurface extends RelativeLayout {
 		RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(
 				(int) (page.getTemplateInfo().width / page.zoomFactor),
 				(int) (page.getTemplateInfo().height / page.zoomFactor));
-		page.title = adapter.getItem(index).title;
 		page.marginLeft = left;
 		page.index = index;
 		page.marginTop = top;
@@ -392,9 +406,22 @@ public class MainSurface extends RelativeLayout {
 		}
 	}
 
-	void createLayout() {
-		layoutCreated = true;
-		currentNote = null;
+	@Override
+	protected void onLayout(boolean changed, int l, int t, int r, int b) {
+		super.onLayout(changed, l, t, r, b);
+		if (changed && forceLayout) { // Changed - re-layout
+			width = parent.getWidth();
+			height = parent.getHeight();
+			forceLayout = false;
+			render();
+		}
+	}
+
+	void createLayout(boolean layoutChanged) {
+		if (layoutChanged) { // (Re)calculate width, height
+			forceLayout = true;
+			return;
+		}
 		render();
 	}
 
@@ -447,7 +474,7 @@ public class MainSurface extends RelativeLayout {
 			noteInfo.y = noteY;
 			adapter.getController().saveNote(noteInfo);
 		}
-		adapter.getController().notifyNoteChanged(null);
+		adapter.getController().notifyNoteChanged(null, false);
 	}
 
 	private Bitmap decodeFile(File f, int width) {
@@ -624,7 +651,7 @@ public class MainSurface extends RelativeLayout {
 									current.files = arr;
 									if (adapter.getController().saveNote(current)) {
 										adapter.getController().removeFile(file);
-										adapter.getController().notifyNoteChanged(current);
+										adapter.getController().notifyNoteChanged(current, false);
 									} else {
 										SuperActivity.notifyUser(getContext(), "Save failed");
 										return;

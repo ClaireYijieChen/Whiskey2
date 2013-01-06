@@ -1,12 +1,26 @@
-<menu xmlns:android="http://schemas.android.com/apk/res/android" >
-
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
         android:id="@+id/menu_sync"
-        android:showAsAction="ifRoom"
+        android:showAsAction="always"
         android:title="Sync"/>
-
     <item
         android:id="@+id/menu_reload"
         android:showAsAction="ifRoom"
         android:title="Reload"/>
+    <item
+        android:id="@+id/menu_fullscreen"
+        android:showAsAction="ifRoom"
+        android:title="Fullscreen"/>
+    <item
+        android:showAsAction="ifRoom"
+        android:title="Sheets">
+        <menu>
+            <item
+                android:id="@+id/menu_add_sheet"
+                android:title="Append sheet"/>
+            <item
+                android:id="@+id/menu_edit_sheet"
+                android:title="Edit sheet"/>
+        </menu>
+    </item>
 </menu>

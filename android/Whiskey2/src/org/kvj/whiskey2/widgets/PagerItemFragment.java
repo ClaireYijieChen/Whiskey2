@@ -12,15 +12,14 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewGroup;
-import android.widget.CompoundButton;
-import android.widget.CompoundButton.OnCheckedChangeListener;
+import android.widget.ImageButton;
 
 import com.actionbarsherlock.app.SherlockFragment;
 
 public class PagerItemFragment extends SherlockFragment implements OnPageZoomListener {
 
 	private static final String TAG = "PagerFragment";
-	private static final long ZOOM_HIDE_MSEC = 3000;
+	private static final long ZOOM_HIDE_MSEC = 4000;
 	private int index = -1;
 	MainSurface surface = null;
 	private SheetsAdapter adapter = null;
@@ -89,6 +88,39 @@ public class PagerItemFragment extends SherlockFragment implements OnPageZoomLis
 		surface.setPageZoomListener(this);
 		surface.setController(index, adapter, getActivity());
 		zoomButtons = (ViewGroup) v.findViewById(R.id.notepad_main_zoom);
+		v.findViewById(R.id.notepad_main_zoom_best_fit).setOnClickListener(new OnClickListener() {
+
+			@Override
+			public void onClick(View v) {
+				if (null != surface) {
+					surface.zoom = MainSurface.ZOOM_BEST_FIT;
+					surface.createLayout(false);
+					hideZoomTask.schedule();
+				}
+			}
+		});
+		v.findViewById(R.id.notepad_main_zoom_fit_page).setOnClickListener(new OnClickListener() {
+
+			@Override
+			public void onClick(View v) {
+				if (null != surface) {
+					surface.zoom = MainSurface.ZOOM_FIT_PAGE;
+					surface.createLayout(false);
+					hideZoomTask.schedule();
+				}
+			}
+		});
+		v.findViewById(R.id.notepad_main_zoom_fit_width).setOnClickListener(new OnClickListener() {
+
+			@Override
+			public void onClick(View v) {
+				if (null != surface) {
+					surface.zoom = MainSurface.ZOOM_FIT_WIDTH;
+					surface.createLayout(false);
+					hideZoomTask.schedule();
+				}
+			}
+		});
 		v.findViewById(R.id.notepad_main_zoom_in).setOnClickListener(new OnClickListener() {
 
 			@Override
@@ -96,7 +128,7 @@ public class PagerItemFragment extends SherlockFragment implements OnPageZoomLis
 				if (null != surface && surface.zoom > MainSurface.ZOOM_STEP) {
 					// Zoom out
 					surface.zoom -= MainSurface.ZOOM_STEP;
-					surface.createLayout();
+					surface.createLayout(false);
 					hideZoomTask.schedule();
 				}
 			}
@@ -107,20 +139,22 @@ public class PagerItemFragment extends SherlockFragment implements OnPageZoomLis
 			public void onClick(View v) {
 				if (null != surface) {
 					surface.zoom += MainSurface.ZOOM_STEP;
-					surface.createLayout();
+					surface.createLayout(false);
 					hideZoomTask.schedule();
 				}
 			}
 		});
-		CompoundButton lockButton = (CompoundButton) v.findViewById(R.id.notepad_main_zoom_lock);
-		lockButton.setOnCheckedChangeListener(new OnCheckedChangeListener() {
+		final ImageButton lockButton = (ImageButton) v.findViewById(R.id.notepad_main_zoom_lock);
+		lockButton.setOnClickListener(new OnClickListener() {
 
 			@Override
-			public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+			public void onClick(View v) {
 				if (null != surface) {
 					hideZoomTask.schedule();
 				}
-				horScroll.setLocked(!isChecked);
+				horScroll.setLocked(!horScroll.isLocked());
+				lockButton.setBackgroundResource(horScroll.isLocked() ? R.drawable.float_button_bg
+						: R.drawable.float_button_bg_checked);
 			}
 		});
 		zoomButtons.setVisibility(View.GONE);
@@ -131,13 +165,9 @@ public class PagerItemFragment extends SherlockFragment implements OnPageZoomLis
 		return notepadID;
 	}
 
-	public void update() {
-		surface.createLayout();
-	}
-
-	public void refresh() {
+	public void refresh(boolean layoutChanged) {
 		if (null != surface) { // Have surface
-			surface.createLayout();
+			surface.createLayout(layoutChanged);
 		}
 	}
 

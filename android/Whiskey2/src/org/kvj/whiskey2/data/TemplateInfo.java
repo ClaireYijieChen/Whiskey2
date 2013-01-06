@@ -6,10 +6,10 @@ import org.kvj.lima1.sync.PJSONObject;
 
 public class TemplateInfo {
 
-	long id;
+	public long id = -1;
 	public String tag;
 	public String type;
-	public String name;
+	public String name = "No template";
 	public JSONObject config;
 	public int width = 102;
 	public int height = 144;

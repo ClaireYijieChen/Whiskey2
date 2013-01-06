@@ -4,5 +4,5 @@
         android:state_pressed="true"
         android:drawable="@drawable/float_button_pressed"/>
     <item
-        android:drawable="@drawable/float_button_normal"/>
+        android:drawable="@drawable/float_button_checked"/>
 </selector>

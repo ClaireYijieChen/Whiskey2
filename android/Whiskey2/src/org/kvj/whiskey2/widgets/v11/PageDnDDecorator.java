@@ -30,11 +30,7 @@ public class PageDnDDecorator {
 					// Log.i(TAG, "Drag start on page: " + info.title + ", " +
 					// event.getAction());
 					if (event.getClipDescription().hasMimeType(NoteDnDDecorator.MIME_NOTE)) {
-						NoteDnDInfo dndInfo = (NoteDnDInfo) event.getLocalState();
-						if (dndInfo.dragType == DragType.Move) {
-							// Single finger drag
-							return true;
-						}
+						return true;
 					}
 					if (event.getClipDescription().hasMimeType(BookmarkDnDDecorator.MIME_BMARK)) {
 						return true;
@@ -43,8 +39,10 @@ public class PageDnDDecorator {
 				case DragEvent.ACTION_DROP:
 					if (event.getClipDescription().hasMimeType(NoteDnDDecorator.MIME_NOTE)) {
 						NoteDnDInfo dndInfo = (NoteDnDInfo) event.getLocalState();
-						main.acceptDrop(surface, info, event.getX(), event.getY(), dndInfo);
-						return true;
+						if (dndInfo.dragType == DragType.Move) { //
+							main.acceptDrop(surface, info, event.getX(), event.getY(), dndInfo);
+							return true;
+						}
 					}
 					if (event.getClipDescription().hasMimeType(BookmarkDnDDecorator.MIME_BMARK)) {
 						main.acceptBookmarkDrop(info, (BookmarkInfo) event.getLocalState());
