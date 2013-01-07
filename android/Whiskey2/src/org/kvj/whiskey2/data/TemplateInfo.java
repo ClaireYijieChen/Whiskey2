@@ -27,4 +27,5 @@ public class TemplateInfo {
 		info.original = obj;
 		return info;
 	}
+
 }

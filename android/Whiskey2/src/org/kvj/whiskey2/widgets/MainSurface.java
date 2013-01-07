@@ -152,8 +152,8 @@ public class MainSurface extends RelativeLayout {
 		TemplateInfo template = adapter.getController().getTemplate(sheet.templateID);
 		final List<PageSurface> pages = new ArrayList<PageSurface>();
 		pages.add(createPage(index, sheet, template));
-		int contentWidth = template.width;
-		int contentHeight = template.height;
+		int contentWidth = sheet.getWidth(template);
+		int contentHeight = sheet.getHeight(template);
 		float pageHeight = height - 2 * pageMargin;
 		float pageWidth = contentWidth * pageHeight / contentHeight + density * SPIRAL_RIGHT_WIDTH;
 		if (pageWidth > width - 2 * pageMargin || zoom == ZOOM_FIT_WIDTH) {
@@ -184,15 +184,16 @@ public class MainSurface extends RelativeLayout {
 		SheetInfo otherSheet = adapter.getItem(index + 1);
 		if (null != otherSheet) { // Not empty
 			TemplateInfo otherTemplate = adapter.getController().getTemplate(otherSheet.templateID);
-			float otherTemplateWidth = otherTemplate.width / zoomFactor;
-			float otherTemplateHeight = otherTemplate.height / zoomFactor;
-			if (2 * pageMargin + template.width / zoomFactor + density * SPIRAL_CENTER_WIDTH + otherTemplateWidth < width) {
+			float otherTemplateWidth = otherSheet.getWidth(otherTemplate) / zoomFactor;
+			float otherTemplateHeight = otherSheet.getHeight(otherTemplate) / zoomFactor;
+			if (2 * pageMargin + contentWidth / zoomFactor + density * SPIRAL_CENTER_WIDTH + otherTemplateWidth < width) {
 				// Width is OK
 				if (2 * pageMargin + otherTemplateHeight <= height) {
 					// Height is OK also
-					pageWidth = template.width / zoomFactor + density * SPIRAL_CENTER_WIDTH + otherTemplateWidth;
-					if (otherTemplate.height < minTemplateHeight) { // Smaller
-						minTemplateHeight = otherTemplate.height;
+					pageWidth = sheet.getWidth(template) / zoomFactor + density * SPIRAL_CENTER_WIDTH
+							+ otherTemplateWidth;
+					if (otherSheet.getHeight(otherTemplate) < minTemplateHeight) { // Smaller
+						minTemplateHeight = otherSheet.getHeight(otherTemplate);
 					}
 					pages.add(createPage(index + 1, otherSheet, otherTemplate));
 				}
@@ -235,7 +236,7 @@ public class MainSurface extends RelativeLayout {
 					page.zoomFactor = zoomFactor;
 					float top = (height - page.getTemplateInfo().height / page.zoomFactor) / 2 + topFix;
 					renderPage(page, (int) left, (int) top);
-					left += page.getTemplateInfo().width / page.zoomFactor;
+					left += page.getSheetInfo().getWidth(page.getTemplateInfo()) / page.zoomFactor;
 					if (i == 0) { // First page - render spiral
 						spiral = new View(getContext());
 						boolean center = pages.size() > 1;
@@ -325,9 +326,9 @@ public class MainSurface extends RelativeLayout {
 	}
 
 	private void renderPage(final PageSurface page, int left, int top) {
-		RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(
-				(int) (page.getTemplateInfo().width / page.zoomFactor),
-				(int) (page.getTemplateInfo().height / page.zoomFactor));
+		RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams((int) (page.getSheetInfo().getWidth(
+				page.getTemplateInfo()) / page.zoomFactor), (int) (page.getSheetInfo()
+				.getHeight(page.getTemplateInfo()) / page.zoomFactor));
 		page.marginLeft = left;
 		page.index = index;
 		page.marginTop = top;

@@ -29,6 +29,7 @@ class Whiskey2
     @templateConfigs = {}
     @templateDrawer = new DrawTemplate this
     @templateConfigs.week = new WeekTemplateConfig this
+    @templateConfigs.grid = new GridTemplateConfig this
     @manager.open (error) =>
       if error
         @manager = null
@@ -1022,7 +1023,7 @@ class Notepad
       [{x: x1, y: y1, width: x2-x1, height: y2-y1}, notes]
 
     offsetToCoordinates = (x, y) ->
-      [Math.floor(x/divContent.width()*template.width), Math.floor(y/divContent.height()*template.height)]
+      [Math.floor(x/divContent.width()*sheetWidth), Math.floor(y/divContent.height()*sheetHeight)]
     stickToGrid = (x, y) =>
       if @stick
         [Math.round(x/@gridStep)*@gridStep, Math.round(y/@gridStep)*@gridStep]
@@ -1032,11 +1033,14 @@ class Notepad
     if not sheet then return null
     template = @app.getTemplate sheet.template_id
     templateConfig = @app.getTemplateConfig template
+    sheetWidth = sheet?.config?.width ? template.width
+    sheetHeight = sheet?.config?.height ? template.height
+    log 'Sheet', sheetWidth, sheetHeight, template.width, template.height
     divContent = div.find('.sheet_content')
     canvas = canto(div.find('.sheet-canvas').get(0))
     canvas.reset()
-    width = @preciseEm template.width
-    height = @preciseEm template.height
+    width = @preciseEm sheetWidth
+    height = @preciseEm sheetHeight
     divContent.css width: "#{width}em", height: "#{height}em"
     divTitle = div.find('.sheet_title')
     divTitle.text(sheet.title ? 'Untitled')
@@ -1175,7 +1179,7 @@ class Notepad
     # log 'Before render:', divContent.width(), divContent.height()
     canvas.width = divContent.width()
     canvas.height = divContent.height()
-    zoom = divContent.width()/template.width
+    zoom = divContent.width()/sheetWidth
     #if templateConfig
     @app.templateDrawer.render template, sheet, canvas, zoom
     @loadNotes sheet, divContent, canvas, zoom
@@ -1310,6 +1314,156 @@ class TemplateConfig
 
   configure: (tmpl, sheet, controller) ->
 
+class GridTemplateConfig extends TemplateConfig
+
+  tmpl: """
+  <div class=\"modal hide\">
+    <div class=\"modal-header\">
+      <h3>Grid sheet config</h3>
+    </div>
+    <div class=\"modal-body\">
+      <table class=\"grid-table\" style=\"width: 100%;\">
+        <tbody></tbody>
+      </table>
+      <div>
+        <a href=\"#\" class=\"btn btn-success dialog-do-add-row\">+ Row</a>
+        <a href=\"#\" class=\"btn btn-success dialog-do-add-col\">+ Column</a>
+        <a href=\"#\" class=\"btn btn-danger dialog-do-remove-row\">- Row</a>
+        <a href=\"#\" class=\"btn btn-danger dialog-do-remove-col\">- Column</a>
+      </div>
+      <div style=\"margin-top: 0.5em;\">
+        <select class=\"size-select\">
+        </select>
+        <select class=\"orientation-select\">
+          <option value=\"0\">Portrait</option>
+          <option value=\"1\">Landscape</option>
+        </select>
+      </div>
+    </div>
+    <div class=\"modal-footer\">
+        <a href=\"#\" class=\"btn btn-primary dialog-do-save\">Save</a>
+        <a href=\"#\" class=\"btn dialog-do-close\">Close</a>
+    </div>
+  </div>
+  """
+  sizes: [{caption: 'A6', width: 102, height: 144}, {caption: 'A5', width: 144, height: 204}, {caption: 'A4', width: 204, height: 288}, {caption: 'A3', width: 288, height: 408}]
+  configure: (tmpl, sheet, controller) ->
+    div = $(@tmpl).appendTo(document.body)
+    div.modal backdrop: 'static', keyboard: no
+    div.find('.dialog-do-close').bind 'click', () =>
+      div.modal('hide').remove()
+    config = sheet.config ? {}
+    config.cols = config.cols ? 2
+    config.rows = config.rows ? 2
+    config.size = config.size ? 0
+    config.orientation = config.orientation ? 0
+    inputs = []
+    saveTable = =>
+      cols = config.cols
+      rows = config.rows
+      config.captions = []
+      for j in [0...rows]
+        row = inputs[j]
+        captions = []
+        config.captions.push(captions)
+        for i in [0...cols]
+          captions[i] = ''
+          if row and row[i] then captions[i] = row[i].val().trim()
+    refreshTable = () =>
+      cols = config.cols
+      rows = config.rows
+      tbody = div.find('.grid-table tbody').empty()
+      inputs = []
+      for j in [0...rows]
+        tr = $(document.createElement('tr')).appendTo(tbody)
+        inputsRow = []
+        inputs.push(inputsRow)
+        captions = config.captions?[j]
+        for i in [0...cols]
+          width = Math.floor(100/(cols))
+          td = $(document.createElement('td')).appendTo(tr)
+          td.width("#{width}%")
+          input = $(document.createElement('input')).attr(type: 'text').appendTo(td)
+          input.css(width: '100%', 'margin-right': '4px', 'padding': '4px 0px', 'margin-top': '9px')
+          if captions?[i] then input.val(captions?[i])
+          inputsRow.push(input)
+    sizeSelect = div.find('.size-select')
+    for i in [0...@sizes.length]
+      size = @sizes[i]
+      option = $(document.createElement('option')).appendTo(sizeSelect)
+      option.attr(value: i)
+      option.text(size.caption)
+    sizeSelect.val(config.size)
+    orientationSelect = div.find('.orientation-select')
+    orientationSelect.val(config.orientation)
+    refreshTable()
+    div.find('.dialog-do-add-row').bind 'click', () =>
+      config.rows++
+      saveTable()
+      refreshTable()
+    div.find('.dialog-do-add-col').bind 'click', () =>
+      config.cols++
+      saveTable()
+      refreshTable()
+    div.find('.dialog-do-remove-row').bind 'click', () =>
+      if config.rows>1
+        config.rows--
+        saveTable()
+        refreshTable()
+    div.find('.dialog-do-remove-col').bind 'click', () =>
+      if config.cols>1
+        config.cols--
+        saveTable()
+        refreshTable()
+    div.find('.dialog-do-save').bind 'click', () =>
+      saveTable()
+      config.size = parseInt(sizeSelect.val())
+      config.orientation = parseInt(orientationSelect.val())
+      size = @sizes[config.size]
+      if size
+        config.width = size.width
+        config.height = size.height
+        if config.orientation is 1
+          [config.width, config.height] = [config.height, config.width]
+      config.draw = @generate config
+      sheet.config = config
+      @app.manager.save 'sheets', sheet, (err) =>
+        if err then return @app.showError err
+        controller.reloadSheets()
+        div.modal('hide').remove()
+
+  LINE_PADDING: 3
+  TEXT_PADDING_X: 3
+  TEXT_PADDING_Y: 3
+  LINE_COLOR: '#dddddd'
+  TEXT_COLOR: '#aaaaaa'
+  TEXT_SIZE: -1
+  generate: (config) ->
+    draw = []
+    stepRows = (config.height-2*@LINE_PADDING) / config.rows
+    stepCols = (config.width-2*@LINE_PADDING) / config.cols
+    left = @LINE_PADDING
+    for i in [0...config.cols]
+      # Draw vertical lines
+      x = Math.round(left)
+      left += stepCols
+      if i>0
+        draw.push(type: 'line', x1: x, y1: @LINE_PADDING, x2: x, y2: config.height - @LINE_PADDING, color: @LINE_COLOR)
+    top = @LINE_PADDING
+    for j in [0...config.rows]
+      y = Math.round(top)
+      top += stepRows
+      if j>0
+        draw.push(type: 'line', x1: @LINE_PADDING, y1: y, x2: config.width-@LINE_PADDING, y2: y, color: @LINE_COLOR)
+      left = @LINE_PADDING
+      captions = config.captions?[j]
+      for i in [0...config.cols]
+        x = Math.round(left)
+        left += stepCols
+        if captions?[i]
+          draw.push(type: 'text', x: x+@TEXT_PADDING_X, y: Math.round(top-@TEXT_PADDING_Y), color: @TEXT_COLOR, text: captions?[i], size: @TEXT_SIZE)
+    return draw
+
 class WeekTemplateConfig extends TemplateConfig
   tmpl: """
   <div class=\"modal hide\">
@@ -1438,176 +1592,3 @@ class DrawTemplate
           textParams item, params
           canvas.fillText(item.text, item.x*zoom, item.y*zoom, params)
       canvas.restore()
-###
-{
-  "draw": [
-    {
-      "type": "line",
-      "color": "#dddddd",
-      "x1": 65,
-      "y1": 11,
-      "x2": 95,
-      "y2": 11
-    },
-    {
-      "type": "text",
-      "x": 90,
-      "y": 9,
-      "text": "月"
-    },
-    {
-      "type": "line",
-      "color": "#dddddd",
-      "x1": 65,
-      "y1": 29,
-      "x2": 95,
-      "y2": 29
-    },
-    {
-      "type": "text",
-      "x": 90,
-      "y": 27,
-      "text": "火"
-    },
-    {
-      "type": "line",
-      "color": "#dddddd",
-      "x1": 65,
-      "y1": 47,
-      "x2": 95,
-      "y2": 47
-    },
-    {
-      "type": "text",
-      "x": 90,
-      "y": 45,
-      "text": "水"
-    },
-    {
-      "type": "line",
-      "color": "#dddddd",
-      "x1": 65,
-      "y1": 65,
-      "x2": 95,
-      "y2": 65
-    },
-    {
-      "type": "text",
-      "x": 90,
-      "y": 63,
-      "text": "木"
-    },
-    {
-      "type": "line",
-      "color": "#dddddd",
-      "x1": 65,
-      "y1": 83,
-      "x2": 95,
-      "y2": 83
-    },
-    {
-      "type": "text",
-      "x": 90,
-      "y": 81,
-      "text": "金"
-    },
-    {
-      "type": "line",
-      "color": "#dddddd",
-      "x1": 65,
-      "y1": 101,
-      "x2": 95,
-      "y2": 101
-    },
-    {
-      "type": "text",
-      "x": 90,
-      "y": 99,
-      "color": "#ff8888",
-      "text": "土"
-    },
-    {
-      "type": "line",
-      "color": "#dddddd",
-      "x1": 65,
-      "y1": 119,
-      "x2": 95,
-      "y2": 119
-    },
-    {
-      "type": "text",
-      "color": "#ff8888",
-      "x": 90,
-      "y": 117,
-      "text": "日"
-    }
-  ]
-}
-###
-
-###
-{
-  "draw": [
-    {
-      "type": "line",
-      "color": "#dddddd",
-      "x1": 5,
-      "y1": 20,
-      "x2": 50,
-      "y2": 20
-    },
-    {
-      "type": "line",
-      "color": "#ff0000",
-      "x1": 5,
-      "width": 2,
-      "y1": 30,
-      "x2": 50,
-      "y2": 30
-    },
-    {
-      "type": "line",
-      "color": "#0000ff",
-      "x1": 5,
-      "width": 3,
-      "y1": 40,
-      "x2": 50,
-      "y2": 40
-    },
-    {
-      "type": "text",
-      "x": 5,
-      "y": 70,
-      "text": "Lorem ipsum"
-    },
-    {
-      "type": "text",
-      "x": 5,
-      "size": -1,
-      "y": 60,
-      "text": "Lorem ipsum"
-    },
-    {
-      "type": "text",
-      "x": 5,
-      "size": -2,
-      "y": 50,
-      "text": "Lorem ipsum"
-    },
-    {
-      "type": "text",
-      "x": 5,
-      "size": 1,
-      "y": 80,
-      "text": "Lorem ipsum"
-    },
-    {
-      "type": "text",
-      "x": 5,
-      "size": 2,
-      "y": 90,
-      "text": "Lorem ipsum"
-    }
-  ]
-}
-###

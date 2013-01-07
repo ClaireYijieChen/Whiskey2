@@ -20,4 +20,18 @@ public class SheetInfo {
 		info.origin = obj;
 		return info;
 	}
+
+	public int getHeight(TemplateInfo template) {
+		if (null != config && config.has("height")) { // Have height in config
+			return config.optInt("height", template.height);
+		}
+		return template.height;
+	}
+
+	public int getWidth(TemplateInfo template) {
+		if (null != config && config.has("width")) { // Have width in config
+			return config.optInt("width", template.width);
+		}
+		return template.width;
+	}
 }
