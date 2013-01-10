@@ -16,8 +16,8 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
-import android.graphics.Paint.Cap;
 import android.graphics.Paint.Style;
+import android.graphics.Path;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
@@ -30,7 +30,7 @@ import android.widget.RelativeLayout;
 public class PageSurface extends View {
 
 	class LinkInfo {
-		float x1, y1, x2, y2;
+		float x1, y1, x2, y2, tx, ty;
 		int color;
 	}
 
@@ -62,6 +62,7 @@ public class PageSurface extends View {
 	private boolean needLinksData = false;
 	List<LinkInfo> links = new ArrayList<PageSurface.LinkInfo>();
 	private LayoutInflater inflater = null;
+	private Path linkPath = new Path();
 
 	public PageSurface(Context context) {
 		super(context);
@@ -164,12 +165,13 @@ public class PageSurface extends View {
 			}
 			needLinksData = false;
 		}
-		float lineWidth = LINK_WIDTH / zoomFactor;
 		for (LinkInfo link : links) { // Draw links
 			linkPaint.setColor(link.color);
-			linkPaint.setStrokeWidth(lineWidth);
-			linkPaint.setStrokeCap(Cap.ROUND);
-			canvas.drawLine(link.x1, link.y1, link.x2, link.y2, linkPaint);
+			linkPath.reset();
+			linkPath.moveTo(link.x1 + link.tx / zoomFactor, link.y1 + link.ty / zoomFactor);
+			linkPath.lineTo(link.x1 - link.tx / zoomFactor, link.y1 - link.ty / zoomFactor);
+			linkPath.lineTo(link.x2, link.y2);
+			canvas.drawPath(linkPath, linkPaint);
 		}
 	}
 
@@ -222,42 +224,31 @@ public class PageSurface extends View {
 	}
 
 	private LinkInfo renderArrow(NoteInfo note1, NoteInfo note2, int color) {
-		float lineWidth = LINK_WIDTH / zoomFactor;
-		float gap = lineWidth;
-		float b1x = note1.widget.getLeft() - marginLeft - gap;
-		float b2x = note2.widget.getLeft() - marginLeft - gap;
-		float b1w = note1.widget.getWidth() + 2 * gap;
-		float b2w = note2.widget.getWidth() + 2 * gap;
+		float b1x = note1.widget.getLeft() - marginLeft;
+		float b2x = note2.widget.getLeft() - marginLeft;
+		float b1w = note1.widget.getWidth();
+		float b2w = note2.widget.getWidth();
 
-		float b1y = note1.widget.getTop() - marginTop - gap;
-		float b2y = note2.widget.getTop() - marginTop - gap;
-		float b1h = note1.widget.getHeight() + 2 * gap;
-		float b2h = note2.widget.getHeight() + 2 * gap;
+		float b1y = note1.widget.getTop() - marginTop;
+		float b2y = note2.widget.getTop() - marginTop;
+		float b1h = note1.widget.getHeight();
+		float b2h = note2.widget.getHeight();
 		float x1 = b1x + b1w / 2;
 		float x2 = b2x + b2w / 2;
 		float y1 = b1y + b1h / 2;
 		float y2 = b2y + b2h / 2;
-		float x0 = x1 < x2 ? b2x : b2x + b2w;
-		float y0 = y1 < y2 ? b2y : b2y + b2h;
-		if (x1 == x2) { // vertival
-			x0 = x1;
-		} else if (y1 == y2) { // horizontal
-			y0 = y1;
-		} else {
-			float a = (y2 - y1) / (x2 - x1);
-			float b = y1 - x1 * a;
-			float _y0 = x0 * a + b;
-			if (b2y < _y0 && _y0 < b2y + b2h) { // Within sizes
-				y0 = _y0;
-			} else {
-				x0 = (y0 - b) / a;
-			}
-		}
+		boolean verticalTriangle = Math.abs(x2 - x1) > Math.abs(y2 - y1);
+		float triangleSize = 2;
 		LinkInfo info = new LinkInfo();
+		if (verticalTriangle) {
+			info.ty = triangleSize;
+		} else {
+			info.tx = triangleSize;
+		}
 		info.x1 = x1;
 		info.y1 = y1;
-		info.x2 = x0;
-		info.y2 = y0;
+		info.x2 = x2;
+		info.y2 = y2;
 		info.color = color;
 		return info;
 	}

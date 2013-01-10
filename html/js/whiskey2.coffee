@@ -775,38 +775,27 @@ class Notepad
 
   loadNotes: (sheet, parent, canvas, zoom) ->
     renderArrow = (div1, div2, color) =>
-      lineWidth = 1.5
-      triangleSize = 3*zoom
-      width = lineWidth*zoom
-      gap = width
-      box1 = x: div1.position().left-gap, y: div1.position().top-gap, w: div1.outerWidth()+2*gap, h: div1.outerHeight()+2*gap
-      box2 = x: div2.position().left-gap, y: div2.position().top-gap, w: div2.outerWidth()+2*gap, h: div2.outerHeight()+2*gap
+      triangleSize = 2*zoom
+      box1 = x: div1.position().left, y: div1.position().top, w: div1.outerWidth(), h: div1.outerHeight()
+      box2 = x: div2.position().left, y: div2.position().top, w: div2.outerWidth(), h: div2.outerHeight()
       x1 = box1.x+box1.w/2
       x2 = box2.x+box2.w/2
       y1 = box1.y+box1.h/2
       y2 = box2.y+box2.h/2
-
-      x0 = if x1<x2 then box2.x else box2.x+box2.w
-      y0 = if y1<y2 then box2.y else box2.y+box2.h
-      if x1 is x2
-        # vertical line
-        x0 = x1
-      else if y1 is y2
-        # horizontal line
-        y0 = y1
+      difx = Math.abs(x2-x1)
+      dify = Math.abs(y2-y1)
+      verticalTriangle = difx>dify
+      if verticalTriangle
+        xt1 = x1
+        xt2 = x1
+        yt1 = y1-triangleSize
+        yt2 = y1+triangleSize
       else
-        a = (y2-y1)/(x2-x1)
-        b = y1-x1*a
-        _y0 = x0*a+b
-        verticalTriangle = no
-        if box2.y <_y0 < (box2.y+box2.h)
-          # Within sizes
-          y0 = _y0
-          verticalTriangle = yes
-        else
-          x0 = (y0-b)/a
-
-      canvas.beginPath().moveTo(x1, y1).lineTo(x0, y0).stroke(lineWidth: width, strokeStyle: color, lineCap: 'round').endPath()
+        xt1 = x1-triangleSize
+        xt2 = x1+triangleSize
+        yt1 = y1
+        yt2 = y1
+      canvas.beginPath().moveTo(xt1, yt1).lineTo(xt2, yt2).lineTo(x2, y2).fill(fillStyle: color).endPath()
 
     renderLinks = (notes) =>
       dotsRadius = 2
@@ -826,7 +815,7 @@ class Notepad
           if index is -1
             createLink = no
           else
-            other = @notes[index]
+            other = notes[index]
             if other.sheet_id isnt note.sheet_id
               createLink = no
           if createLink

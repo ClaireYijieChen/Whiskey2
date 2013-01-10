@@ -1185,46 +1185,40 @@
       var loadNote, renderArrow, renderBookmarks, renderLinks,
         _this = this;
       renderArrow = function(div1, div2, color) {
-        var a, b, box1, box2, gap, lineWidth, width, x0, x1, x2, y0, y1, y2, _y0;
-        lineWidth = 1.5;
-        width = lineWidth * zoom;
-        gap = width;
+        var box1, box2, difx, dify, triangleSize, verticalTriangle, x1, x2, xt1, xt2, y1, y2, yt1, yt2;
+        triangleSize = 2 * zoom;
         box1 = {
-          x: div1.position().left - gap,
-          y: div1.position().top - gap,
-          w: div1.outerWidth() + 2 * gap,
-          h: div1.outerHeight() + 2 * gap
+          x: div1.position().left,
+          y: div1.position().top,
+          w: div1.outerWidth(),
+          h: div1.outerHeight()
         };
         box2 = {
-          x: div2.position().left - gap,
-          y: div2.position().top - gap,
-          w: div2.outerWidth() + 2 * gap,
-          h: div2.outerHeight() + 2 * gap
+          x: div2.position().left,
+          y: div2.position().top,
+          w: div2.outerWidth(),
+          h: div2.outerHeight()
         };
         x1 = box1.x + box1.w / 2;
         x2 = box2.x + box2.w / 2;
         y1 = box1.y + box1.h / 2;
         y2 = box2.y + box2.h / 2;
-        x0 = x1 < x2 ? box2.x : box2.x + box2.w;
-        y0 = y1 < y2 ? box2.y : box2.y + box2.h;
-        if (x1 === x2) {
-          x0 = x1;
-        } else if (y1 === y2) {
-          y0 = y1;
+        difx = Math.abs(x2 - x1);
+        dify = Math.abs(y2 - y1);
+        verticalTriangle = difx > dify;
+        if (verticalTriangle) {
+          xt1 = x1;
+          xt2 = x1;
+          yt1 = y1 - triangleSize;
+          yt2 = y1 + triangleSize;
         } else {
-          a = (y2 - y1) / (x2 - x1);
-          b = y1 - x1 * a;
-          _y0 = x0 * a + b;
-          if ((box2.y < _y0 && _y0 < (box2.y + box2.h))) {
-            y0 = _y0;
-          } else {
-            x0 = (y0 - b) / a;
-          }
+          xt1 = x1 - triangleSize;
+          xt2 = x1 + triangleSize;
+          yt1 = y1;
+          yt2 = y1;
         }
-        return canvas.beginPath().moveTo(x1, y1).lineTo(x0, y0).stroke({
-          lineWidth: width,
-          strokeStyle: color,
-          lineCap: 'round'
+        return canvas.beginPath().moveTo(xt1, yt1).lineTo(xt2, yt2).lineTo(x2, y2).fill({
+          fillStyle: color
         }).endPath();
       };
       renderLinks = function(notes) {
@@ -1255,7 +1249,7 @@
               if (index === -1) {
                 createLink = false;
               } else {
-                other = this.notes[index];
+                other = notes[index];
                 if (other.sheet_id !== note.sheet_id) createLink = false;
               }
               if (createLink) {

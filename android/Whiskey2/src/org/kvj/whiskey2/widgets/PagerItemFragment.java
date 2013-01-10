@@ -12,11 +12,30 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewGroup;
+import android.view.animation.AccelerateInterpolator;
+import android.view.animation.AlphaAnimation;
+import android.view.animation.AnimationSet;
 import android.widget.ImageButton;
 
 import com.actionbarsherlock.app.SherlockFragment;
 
 public class PagerItemFragment extends SherlockFragment implements OnPageZoomListener {
+
+	static AnimationSet fadeIn = null;
+	static AnimationSet fadeOut = null;
+
+	static {
+		fadeIn = new AnimationSet(true);
+		fadeIn.setDuration(150);
+		fadeIn.setInterpolator(new AccelerateInterpolator(1f));
+		AlphaAnimation alpha = new AlphaAnimation(0f, 1f);
+		fadeIn.addAnimation(alpha);
+		fadeOut = new AnimationSet(true);
+		fadeOut.setDuration(750);
+		fadeOut.setInterpolator(new AccelerateInterpolator(1f));
+		alpha = new AlphaAnimation(1f, 0f);
+		fadeOut.addAnimation(alpha);
+	}
 
 	private static final String TAG = "PagerFragment";
 	private static final long ZOOM_HIDE_MSEC = 4000;
@@ -35,6 +54,8 @@ public class PagerItemFragment extends SherlockFragment implements OnPageZoomLis
 					@Override
 					public void run() {
 						zoomButtons.setVisibility(View.GONE);
+						zoomButtons.clearAnimation();
+						zoomButtons.startAnimation(fadeOut);
 					}
 				});
 			}
@@ -173,7 +194,10 @@ public class PagerItemFragment extends SherlockFragment implements OnPageZoomLis
 
 	@Override
 	public void onShow() {
-		zoomButtons.setVisibility(View.VISIBLE);
+		if (zoomButtons.getVisibility() != View.VISIBLE) { // Not visible
+			zoomButtons.setVisibility(View.VISIBLE);
+			zoomButtons.startAnimation(fadeIn);
+		}
 		hideZoomTask.schedule();
 	}
 }
