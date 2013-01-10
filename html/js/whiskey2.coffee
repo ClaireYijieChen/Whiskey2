@@ -43,8 +43,15 @@ class Whiskey2
         @refreshNotepads()
         @refreshTemplates()
       @manager.start_ping (err, haveData) =>
-        if haveData then @sync()
-      @sync()
+        if haveData then @sync =>
+          if @selected then @selected.reloadSheets()
+      @sync =>
+        notepadID = null
+        if @selected then return
+        for id of @notepads
+          notepadID = id
+          break
+        if notepadID then @selectNotepad notepadID
 
   showLoginDialog: ->
     $('#main-password').val('')
@@ -124,6 +131,7 @@ class Whiskey2
       $('#main-tabs li.main-tab-notepad').remove()
       $('#main-tabs-content .main-tab-notepad').remove()
       @notepads = {}
+      @selected = null
       @sortWithNext arr
       moveNotepad = (index, id) =>
         @moveWithNext 'notepads', arr, index, [id], (err) =>
@@ -156,10 +164,18 @@ class Whiskey2
               e.stopPropagation()
           a.bind 'click', (e) =>
             e.preventDefault()
-            a.tab('show')
-        @renderNotepad div, item
+            @selectNotepad(item.id)
+        n = @renderNotepad div, item
+        n.anchor = a
         if item.id is selectID
-          a.tab('show')
+          @selectNotepad(item.id)
+
+  selectNotepad: (id) ->
+    n = @notepads[id]
+    if not n then return @showError 'Notepad not found'
+    n.anchor.tab('show')
+    n.reloadSheets()
+    @selected = n
 
   doAddNotepad: ->
     name = $('#main-add-notepad-name').val().trim()
@@ -189,20 +205,20 @@ class Whiskey2
       @showAlert 'Login OK', severity: 'success'
       @sync()
 
-  sync: ->
+  sync: (handler) ->
     if not @manager then return
     # @showAlert 'Sync started'
     @manager.sync (err) =>
       if err then return @showError err
-      # @showAlert 'Sync done'
-      @refreshTemplates()
+      @refreshTemplates =>
+        if handler then handler()
     , (type) =>
       w = 100
       switch type
         when 0 then w = 25
         when 1 then w = 50
         when 2 then w = 75
-      log 'Sync progress', w, type
+      # log 'Sync progress', w, type
       @syncProgressBar.width "#{w}%"
 
   showError: (message) ->
@@ -487,6 +503,7 @@ class Notepad
     @app.manager.findOne 'bookmarks', id, (err, bmark) =>
       if err then return @app.showError err
       bmark.sheet_id = sheet.id
+      bmark.notepad_id = @notepad.id
       @app.manager.save 'bookmarks', bmark, (err) =>
         if err then return @app.showError err
         @reloadSheetsBookmarks()
@@ -605,9 +622,10 @@ class Notepad
       if err then return @app.showError err
       @sheets = @app.sortWithNext sheets
       @renderSheetMiniatures @sheets
-      if @lastSheetID
-        index = @app.findByID @sheets, @lastSheetID
-        if index isnt -1 then @loadSheets index
+      index = @app.findByID @sheets, @lastSheetID
+      if index is -1 and @sheets.length>0
+        index = 0
+      if index isnt -1 then @loadSheets index
 
   maxSheetsVisible: 2
 
@@ -758,6 +776,7 @@ class Notepad
   loadNotes: (sheet, parent, canvas, zoom) ->
     renderArrow = (div1, div2, color) =>
       lineWidth = 1.5
+      triangleSize = 3*zoom
       width = lineWidth*zoom
       gap = width
       box1 = x: div1.position().left-gap, y: div1.position().top-gap, w: div1.outerWidth()+2*gap, h: div1.outerHeight()+2*gap
@@ -766,6 +785,7 @@ class Notepad
       x2 = box2.x+box2.w/2
       y1 = box1.y+box1.h/2
       y2 = box2.y+box2.h/2
+
       x0 = if x1<x2 then box2.x else box2.x+box2.w
       y0 = if y1<y2 then box2.y else box2.y+box2.h
       if x1 is x2
@@ -778,11 +798,14 @@ class Notepad
         a = (y2-y1)/(x2-x1)
         b = y1-x1*a
         _y0 = x0*a+b
+        verticalTriangle = no
         if box2.y <_y0 < (box2.y+box2.h)
           # Within sizes
           y0 = _y0
+          verticalTriangle = yes
         else
           x0 = (y0-b)/a
+
       canvas.beginPath().moveTo(x1, y1).lineTo(x0, y0).stroke(lineWidth: width, strokeStyle: color, lineCap: 'round').endPath()
 
     renderLinks = (notes) =>
@@ -1035,7 +1058,6 @@ class Notepad
     templateConfig = @app.getTemplateConfig template
     sheetWidth = sheet?.config?.width ? template.width
     sheetHeight = sheet?.config?.height ? template.height
-    log 'Sheet', sheetWidth, sheetHeight, template.width, template.height
     divContent = div.find('.sheet_content')
     canvas = canto(div.find('.sheet-canvas').get(0))
     canvas.reset()
@@ -1048,7 +1070,7 @@ class Notepad
       @showSheetDialog sheet, =>
         @reloadSheets()
     div.find('.sheet-toolbar-add-bmark').unbind('click').bind 'click', ()=>
-      @showBMarkDialog {sheet_id: sheet.id}, =>
+      @showBMarkDialog {sheet_id: sheet.id, notepad_id: @notepad.id}, =>
         @reloadSheetsBookmarks()
     configButton = div.find('.sheet-toolbar-config')
     if templateConfig

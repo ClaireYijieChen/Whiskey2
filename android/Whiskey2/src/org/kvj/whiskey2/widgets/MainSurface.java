@@ -365,7 +365,8 @@ public class MainSurface extends RelativeLayout {
 				float x = page.getLastDownX() * page.zoomFactor;
 				float y = page.getLastDownY() * page.zoomFactor;
 				// Log.i(TAG, "On long page click: " + x + "x" + y);
-				NoteInfo info = new NoteInfo();
+				Integer[] widths = adapter.getController().getWidths();
+				NoteInfo info = new NoteInfo(widths != null ? widths[1] : 0);
 				info.x = adapter.getController().stickToGrid(x);
 				info.y = adapter.getController().stickToGrid(y);
 				info.sheetID = page.getSheetInfo().id;

@@ -47,7 +47,6 @@ public class DataController {
 	final Object connectorLock = new Object();
 	private Integer[] colors = { R.drawable.note0, R.drawable.note1, R.drawable.note2, R.drawable.note3,
 			R.drawable.note4, R.drawable.note5, R.drawable.note6, R.drawable.note7 };
-	public static Integer[] widths = { 50, 75, 90, 120, 150 };
 	private int gridStep = 3;
 	List<DataControllerListener> listeners = new ArrayList<DataController.DataControllerListener>();
 	Map<Long, List<BookmarkInfo>> bookmarks = new HashMap<Long, List<BookmarkInfo>>();
@@ -358,7 +357,25 @@ public class DataController {
 	}
 
 	public Integer[] getWidths() {
-		return widths;
+		SyncService svc = getRemote();
+		if (null == svc) { // No connection
+			Log.w(TAG, "No service");
+			return new Integer[0];
+		}
+		try { // Remote errors
+			PJSONObject data = svc.getData();
+			if (null != data) { // Have data
+				JSONArray widths = data.optJSONArray("widths");
+				Integer[] result = new Integer[widths.length()];
+				for (int i = 0; i < result.length; i++) { // Copy
+					result[i] = widths.getInt(i);
+				}
+				return result;
+			}
+		} catch (Exception e) {
+			Log.e(TAG, "Error getting widths from data:", e);
+		}
+		return new Integer[0];
 	}
 
 	public void notifyNoteChanged(NoteInfo note, boolean layoutChanged) {

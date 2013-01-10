@@ -66,9 +66,22 @@
           return _this.refreshTemplates();
         });
         _this.manager.start_ping(function(err, haveData) {
-          if (haveData) return _this.sync();
+          if (haveData) {
+            return _this.sync(function() {
+              if (_this.selected) return _this.selected.reloadSheets();
+            });
+          }
         });
-        return _this.sync();
+        return _this.sync(function() {
+          var id, notepadID;
+          notepadID = null;
+          if (_this.selected) return;
+          for (id in _this.notepads) {
+            notepadID = id;
+            break;
+          }
+          if (notepadID) return _this.selectNotepad(notepadID);
+        });
       });
     };
 
@@ -196,11 +209,12 @@
           "var": 1
         }
       ], function(err, arr) {
-        var a, div, i, item, li, moveNotepad, _fn, _ref, _results;
+        var a, div, i, item, li, moveNotepad, n, _fn, _ref, _results;
         if (err) return _this.showError(err);
         $('#main-tabs li.main-tab-notepad').remove();
         $('#main-tabs-content .main-tab-notepad').remove();
         _this.notepads = {};
+        _this.selected = null;
         _this.sortWithNext(arr);
         moveNotepad = function(index, id) {
           return _this.moveWithNext('notepads', arr, index, [id], function(err) {
@@ -236,7 +250,7 @@
           });
           return a.bind('click', function(e) {
             e.preventDefault();
-            return a.tab('show');
+            return _this.selectNotepad(item.id);
           });
         };
         _results = [];
@@ -253,15 +267,25 @@
           });
           $('#main-tabs-content').append(div);
           _fn(a, item, i);
-          _this.renderNotepad(div, item);
+          n = _this.renderNotepad(div, item);
+          n.anchor = a;
           if (item.id === selectID) {
-            _results.push(a.tab('show'));
+            _results.push(_this.selectNotepad(item.id));
           } else {
             _results.push(void 0);
           }
         }
         return _results;
       });
+    };
+
+    Whiskey2.prototype.selectNotepad = function(id) {
+      var n;
+      n = this.notepads[id];
+      if (!n) return this.showError('Notepad not found');
+      n.anchor.tab('show');
+      n.reloadSheets();
+      return this.selected = n;
     };
 
     Whiskey2.prototype.doAddNotepad = function() {
@@ -310,12 +334,14 @@
       });
     };
 
-    Whiskey2.prototype.sync = function() {
+    Whiskey2.prototype.sync = function(handler) {
       var _this = this;
       if (!this.manager) return;
       return this.manager.sync(function(err) {
         if (err) return _this.showError(err);
-        return _this.refreshTemplates();
+        return _this.refreshTemplates(function() {
+          if (handler) return handler();
+        });
       }, function(type) {
         var w;
         w = 100;
@@ -329,7 +355,6 @@
           case 2:
             w = 75;
         }
-        log('Sync progress', w, type);
         return _this.syncProgressBar.width("" + w + "%");
       });
     };
@@ -764,6 +789,7 @@
       return this.app.manager.findOne('bookmarks', id, function(err, bmark) {
         if (err) return _this.app.showError(err);
         bmark.sheet_id = sheet.id;
+        bmark.notepad_id = _this.notepad.id;
         return _this.app.manager.save('bookmarks', bmark, function(err) {
           if (err) return _this.app.showError(err);
           return _this.reloadSheetsBookmarks();
@@ -942,10 +968,9 @@
         if (err) return _this.app.showError(err);
         _this.sheets = _this.app.sortWithNext(sheets);
         _this.renderSheetMiniatures(_this.sheets);
-        if (_this.lastSheetID) {
-          index = _this.app.findByID(_this.sheets, _this.lastSheetID);
-          if (index !== -1) return _this.loadSheets(index);
-        }
+        index = _this.app.findByID(_this.sheets, _this.lastSheetID);
+        if (index === -1 && _this.sheets.length > 0) index = 0;
+        if (index !== -1) return _this.loadSheets(index);
       });
     };
 
@@ -1610,7 +1635,6 @@
       templateConfig = this.app.getTemplateConfig(template);
       sheetWidth = (_ref = sheet != null ? (_ref2 = sheet.config) != null ? _ref2.width : void 0 : void 0) != null ? _ref : template.width;
       sheetHeight = (_ref3 = sheet != null ? (_ref4 = sheet.config) != null ? _ref4.height : void 0 : void 0) != null ? _ref3 : template.height;
-      log('Sheet', sheetWidth, sheetHeight, template.width, template.height);
       divContent = div.find('.sheet_content');
       canvas = canto(div.find('.sheet-canvas').get(0));
       canvas.reset();
@@ -1629,7 +1653,8 @@
       });
       div.find('.sheet-toolbar-add-bmark').unbind('click').bind('click', function() {
         return _this.showBMarkDialog({
-          sheet_id: sheet.id
+          sheet_id: sheet.id,
+          notepad_id: _this.notepad.id
         }, function() {
           return _this.reloadSheetsBookmarks();
         });

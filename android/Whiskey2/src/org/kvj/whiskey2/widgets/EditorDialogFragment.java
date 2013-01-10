@@ -144,8 +144,8 @@ public class EditorDialogFragment extends SherlockDialogFragment {
 			SuperActivity.notifyUser(getActivity(), "Note not found");
 			return;
 		}
-		SuperActivity.showQuestionDialog(getActivity(), "Remove note?",
-				"Are you sure want to remove note?", new Runnable() {
+		SuperActivity.showQuestionDialog(getActivity(), "Remove note?", "Are you sure want to remove note?",
+				new Runnable() {
 
 					@Override
 					public void run() {
@@ -166,7 +166,7 @@ public class EditorDialogFragment extends SherlockDialogFragment {
 			SuperActivity.notifyUser(getActivity(), "Text is empty");
 			return;
 		}
-		NoteInfo info = new NoteInfo();
+		NoteInfo info = new NoteInfo(0);
 		if (-1 == formController.getValue(KEY_ID, Long.class)) { // New note
 			SheetInfo sheet = controller.getSheet(formController.getValue(KEY_SHEET_ID, Long.class));
 			if (null == sheet) { // Invalid data

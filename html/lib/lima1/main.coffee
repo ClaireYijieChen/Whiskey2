@@ -616,10 +616,9 @@ class HTML5Provider extends DBProvider
     window?.localStorage[env.prefix+name] = value
 
 class SchemaInfo
-  tables: {}
-  upgrades: 0
 
   constructor: (@json) ->
+    @tables = {}
     @upgrades = @parseSchema @json
     @rev = @json._rev ? 0
 
@@ -659,6 +658,7 @@ class SchemaInfo
     sqls = []
     for name, table of @tables
       otherTable = from?.tables[name]
+      log 'Upgrade:', name, table, otherTable
       if not otherTable
         # new table
         @createTable name, table, sqls
@@ -667,10 +667,13 @@ class SchemaInfo
     return sqls
 
   alterTable: (name, table, other, sqls) ->
+    log 'AlterTable:', name, table
     for field of table.texts
+      log 'alterTable', field, other.texts[field]
       if not other.texts[field]
         sqls.push "alter table t_#{name} add f_#{field} text"
     for field of table.numbers
+      log 'alterTable', field, other.numbers[field]
       if not other.numbers[field]
         sqls.push "alter table t_#{name} add f_#{field} integer"
     for i in [other.indexes.length...table.indexes.length]
@@ -716,9 +719,9 @@ class StorageProvider
           log 'StorageProvider::Verify result', err, reset
           if err then return handler err
           @db.query 'select schema, token from schema', [], (err, data) =>
-            # log 'Schema', err, data
             if err then return handler err
             if data.length>0
+              log 'Schema', err, data[0].schema
               schema = JSON.parse data[0].schema
               @token = data[0].token
               @schemaInfo = new SchemaInfo schema
@@ -780,7 +783,7 @@ class StorageProvider
         return send_in null
       progress_handler @SYNC_READ_DATA
       @db.query 'select id, name, status from uploads order by id limit 1', [], (err, data) =>
-        log 'Upload:', data
+        # log 'Upload:', data
         if err then return finish_sync err
         if data.length is 0 then return send_in null
         row = data[0]
@@ -891,8 +894,10 @@ class StorageProvider
       if not @schemaInfo or @schemaInfo.rev < schema._rev
         schemaInfo = new SchemaInfo schema
         sqls = schemaInfo.upgradeSchema @schemaInfo
+        log 'Upgrade:', sqls, schemaInfo, @schemaInfo
         gr = new AsyncGrouper sqls.length, (gr) =>
           err = gr.findError()
+          log 'Upgrade done', err
           if err then return finish_sync err
           @schemaInfo = schemaInfo
           gr = new AsyncGrouper 2, (gr) =>

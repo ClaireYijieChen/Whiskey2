@@ -14,7 +14,7 @@ public class NoteInfo {
 	public long id = -1;
 	public boolean collapsible = false;
 	public String text;
-	public int width = DataController.widths[1];
+	public int width = 0;
 	public int x;
 	public int y;
 	public int color;
@@ -28,8 +28,12 @@ public class NoteInfo {
 	public Map<String, String> fileCache = new HashMap<String, String>();
 	public int touchedPoints = 1;
 
+	public NoteInfo(int width) {
+		this.width = width;
+	}
+
 	public static NoteInfo fromJSON(PJSONObject obj) throws JSONException {
-		NoteInfo info = new NoteInfo();
+		NoteInfo info = new NoteInfo(0);
 		info.id = obj.getLong("id");
 		info.color = obj.optInt("color");
 		info.text = obj.optString("text", "");
