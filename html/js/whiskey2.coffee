@@ -30,6 +30,7 @@ class Whiskey2
     @templateDrawer = new DrawTemplate this
     @templateConfigs.week = new WeekTemplateConfig this
     @templateConfigs.grid = new GridTemplateConfig this
+    @templateConfigs.chronodex = new ChronodexConfig this
     @manager.open (error) =>
       if error
         @manager = null
@@ -1325,6 +1326,148 @@ class TemplateConfig
 
   configure: (tmpl, sheet, controller) ->
 
+class DialogTemplateConfig extends TemplateConfig
+  title: 'Sheet config'
+  tmpl: """
+  <div class=\"modal hide\">
+    <div class=\"modal-header\">
+      <h3>Grid sheet config</h3>
+    </div>
+    <div class=\"modal-body\">
+    </div>
+    <div class=\"modal-footer\">
+        <a href=\"#\" class=\"btn btn-primary dialog-do-save\">Save</a>
+        <a href=\"#\" class=\"btn dialog-do-close\">Close</a>
+    </div>
+  </div>
+  """
+  sheetSizeTmpl: """
+  <form class=\"form-horizontal\">
+    <div class=\"control-group\">
+      <label class=\"control-label\" for=\"main-login\">Page size:</label>
+      <div class=\"controls\">
+        <select class=\"size-select\">
+        </select>
+      </div>
+    </div>
+    <div class=\"control-group\">
+      <label class=\"control-label\" for=\"main-password\">Orientation:</label>
+      <div class=\"controls\">
+        <select class=\"orientation-select\">
+          <option value=\"0\">Portrait</option>
+          <option value=\"1\">Landscape</option>
+        </select>
+      </div>
+    </div>
+  </form>
+  """
+  sizes: [{caption: 'A6', width: 102, height: 144}, {caption: 'A5', width: 144, height: 204}, {caption: 'A4', width: 204, height: 288}, {caption: 'A3', width: 288, height: 408}]
+
+  createForm: (div, tmpl, config) ->
+    return () ->
+
+  createSheetSizeForm: (div, tmpl, config) ->
+    form = $(@sheetSizeTmpl).appendTo(div)
+    config.size = config.size ? 0
+    config.orientation = config.orientation ? 0
+    sizeSelect = form.find('.size-select')
+    for i in [0...@sizes.length]
+      size = @sizes[i]
+      option = $(document.createElement('option')).appendTo(sizeSelect)
+      option.attr(value: i)
+      option.text(size.caption)
+    sizeSelect.val(config.size)
+    orientationSelect = form.find('.orientation-select')
+    orientationSelect.val(config.orientation)
+    return () =>
+      config.size = parseInt(sizeSelect.val())
+      config.orientation = parseInt(orientationSelect.val())
+      size = @sizes[config.size]
+      if size
+        config.width = size.width
+        config.height = size.height
+        if config.orientation is 1
+          [config.width, config.height] = [config.height, config.width]
+
+
+  configure: (tmpl, sheet, controller) ->
+    div = $(@tmpl).appendTo(document.body)
+    div.find('.modal-header h3').text(@title)
+    div.modal backdrop: 'static', keyboard: no
+    div.find('.dialog-do-close').bind 'click', () =>
+      div.modal('hide').remove()
+    config = sheet.config ? {}
+    fn = @createForm(div.find('.modal-body'), tmpl, config)
+    div.find('.dialog-do-save').bind 'click', () =>
+      fn()
+      sheet.config = config
+      @app.manager.save 'sheets', sheet, (err) =>
+        if err then return @app.showError err
+        controller.reloadSheets()
+        div.modal('hide').remove()
+
+class ChronodexConfig extends DialogTemplateConfig
+  title: 'Chronodex config'
+
+  formTmpl: """
+  <form class=\"form-horizontal\">
+    <div class=\"control-group\">
+      <label class=\"control-label\">Position:</label>
+      <div class=\"controls\">
+        <select class=\"align-select\">
+          <option value=\"l\">Left</option>
+          <option value=\"c\">Center</option>
+          <option value=\"r\">Right</option>
+        </select>
+        <select class=\"valign-select\">
+          <option value=\"t\">Top</option>
+          <option value=\"m\">Middle</option>
+          <option value=\"b\">Bottom</option>
+        </select>
+      </div>
+    </div>
+    <div class=\"control-group\">
+      <label class=\"control-label\">Zoom (%):</label>
+      <div class=\"controls\">
+        <input type=\"text\" class=\"zoom-text\"/>
+      </div>
+    </div>
+  </form>
+  """
+  createForm: (div, tmpl, config) ->
+    form = $(@formTmpl).appendTo(div)
+    config.align = config.align ? 'c'
+    config.valign = config.valign ? 'm'
+    config.zoom = config.zoom ? 100
+    alignSelect = form.find('.align-select').val(config.align)
+    valignSelect = form.find('.valign-select').val(config.valign)
+    zoomText = form.find('.zoom-text').val(config.zoom)
+    sizeFn = @createSheetSizeForm(div, tmpl, config)
+    return () =>
+      config.align = alignSelect.val()
+      config.valign = valignSelect.val()
+      config.zoom = parseInt(zoomText.val()) ? 100
+      sizeFn()
+      config.draw = @generate(config)
+
+  generate: (config) ->
+    draw = []
+    centerx = config.width / 2
+    centery = config.height / 2
+    circleRadius = 10
+    degStep = 30
+    heights = [15, 20, 25]
+    lineColor = '#000000'
+    draw.push(type: 'circle', color: lineColor, x: centerx, y: centery, r: circleRadius)
+    deg = 0
+    for i in [0...12]
+      height = heights[i % heights.length]
+      draw.push(type: 'arc', color: lineColor, x: centerx, y: centery, r: height, sa: deg, ea: deg+degStep)
+      draw.push(type: 'move', x: centerx, y: centery, a: deg, items: [{type: 'line', x1: circleRadius, y1: 0, x2: height, y2: 0, color: lineColor}])
+      deg += degStep
+      draw.push(type: 'move', x: centerx, y: centery, a: deg, items: [{type: 'line', x1: circleRadius, y1: 0, x2: height, y2: 0, color: lineColor}])
+    return draw
+
 class GridTemplateConfig extends TemplateConfig
 
   tmpl: """
@@ -1592,14 +1735,33 @@ class DrawTemplate
         when 1 then fontPixels = zoom*6.5
         when 2 then fontPixels = zoom*7.5
       params.font = ''+(Math.round(fontPixels*100)/100)+'px Arial'
-    for item in data
-      canvas.save()
-      params = {}
-      switch item.type
-        when 'line'
-          lineParams item, params
-          canvas.beginPath().moveTo(item.x1*zoom, item.y1*zoom).lineTo(item.x2*zoom, item.y2*zoom).paint(params).endPath()
-        when 'text'
-          textParams item, params
-          canvas.fillText(item.text, item.x*zoom, item.y*zoom, params)
-      canvas.restore()
+    processArray = (data) =>
+      for item in data
+        canvas.save()
+        params = {}
+        switch item.type
+          when 'circle'
+            lineParams item, params
+            canvas.beginPath().arc(item.x*zoom, item.y*zoom, item.r*zoom).stroke(params).endPath()
+          when 'arc'
+            canvas.angleUnit = 'degrees'
+            lineParams item, params
+            canvas.beginPath().arc(item.x*zoom, item.y*zoom, item.r*zoom, item.sa, item.ea).stroke(params).endPath()
+          when 'line'
+            lineParams item, params
+            canvas.beginPath().moveTo(item.x1*zoom, item.y1*zoom).lineTo(item.x2*zoom, item.y2*zoom).paint(params).endPath()
+          when 'text'
+            textParams item, params
+            canvas.fillText(item.text, item.x*zoom, item.y*zoom, params)
+          when 'move'
+            items = item.items ? []
+            canvas.save()
+            if item.x and item.y
+              canvas.translate(item.x*zoom, item.y*zoom)
+            if item.a
+              canvas.angleUnit = 'degrees'
+              canvas.rotate(item.a)
+            processArray(items)
+            canvas.restore()
+        canvas.restore()
+    processArray(data)

@@ -1,5 +1,5 @@
 (function() {
-  var DrawTemplate, GridTemplateConfig, Notepad, TemplateConfig, TemplateManager, WeekTemplateConfig, Whiskey2,
+  var ChronodexConfig, DialogTemplateConfig, DrawTemplate, GridTemplateConfig, Notepad, TemplateConfig, TemplateManager, WeekTemplateConfig, Whiskey2,
     __slice = Array.prototype.slice,
     __hasProp = Object.prototype.hasOwnProperty,
     __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor; child.__super__ = parent.prototype; return child; };
@@ -48,6 +48,7 @@
       this.templateDrawer = new DrawTemplate(this);
       this.templateConfigs.week = new WeekTemplateConfig(this);
       this.templateConfigs.grid = new GridTemplateConfig(this);
+      this.templateConfigs.chronodex = new ChronodexConfig(this);
       return this.manager.open(function(error) {
         if (error) {
           _this.manager = null;
@@ -2056,6 +2057,208 @@
 
   })();
 
+  DialogTemplateConfig = (function(_super) {
+
+    __extends(DialogTemplateConfig, _super);
+
+    function DialogTemplateConfig() {
+      DialogTemplateConfig.__super__.constructor.apply(this, arguments);
+    }
+
+    DialogTemplateConfig.prototype.title = 'Sheet config';
+
+    DialogTemplateConfig.prototype.tmpl = "<div class=\"modal hide\">\n  <div class=\"modal-header\">\n    <h3>Grid sheet config</h3>\n  </div>\n  <div class=\"modal-body\">\n  </div>\n  <div class=\"modal-footer\">\n      <a href=\"#\" class=\"btn btn-primary dialog-do-save\">Save</a>\n      <a href=\"#\" class=\"btn dialog-do-close\">Close</a>\n  </div>\n</div>";
+
+    DialogTemplateConfig.prototype.sheetSizeTmpl = "<form class=\"form-horizontal\">\n  <div class=\"control-group\">\n    <label class=\"control-label\" for=\"main-login\">Page size:</label>\n    <div class=\"controls\">\n      <select class=\"size-select\">\n      </select>\n    </div>\n  </div>\n  <div class=\"control-group\">\n    <label class=\"control-label\" for=\"main-password\">Orientation:</label>\n    <div class=\"controls\">\n      <select class=\"orientation-select\">\n        <option value=\"0\">Portrait</option>\n        <option value=\"1\">Landscape</option>\n      </select>\n    </div>\n  </div>\n</form>";
+
+    DialogTemplateConfig.prototype.sizes = [
+      {
+        caption: 'A6',
+        width: 102,
+        height: 144
+      }, {
+        caption: 'A5',
+        width: 144,
+        height: 204
+      }, {
+        caption: 'A4',
+        width: 204,
+        height: 288
+      }, {
+        caption: 'A3',
+        width: 288,
+        height: 408
+      }
+    ];
+
+    DialogTemplateConfig.prototype.createForm = function(div, tmpl, config) {
+      return function() {};
+    };
+
+    DialogTemplateConfig.prototype.createSheetSizeForm = function(div, tmpl, config) {
+      var form, i, option, orientationSelect, size, sizeSelect, _ref, _ref2, _ref3,
+        _this = this;
+      form = $(this.sheetSizeTmpl).appendTo(div);
+      config.size = (_ref = config.size) != null ? _ref : 0;
+      config.orientation = (_ref2 = config.orientation) != null ? _ref2 : 0;
+      sizeSelect = form.find('.size-select');
+      for (i = 0, _ref3 = this.sizes.length; 0 <= _ref3 ? i < _ref3 : i > _ref3; 0 <= _ref3 ? i++ : i--) {
+        size = this.sizes[i];
+        option = $(document.createElement('option')).appendTo(sizeSelect);
+        option.attr({
+          value: i
+        });
+        option.text(size.caption);
+      }
+      sizeSelect.val(config.size);
+      orientationSelect = form.find('.orientation-select');
+      orientationSelect.val(config.orientation);
+      return function() {
+        var _ref4;
+        config.size = parseInt(sizeSelect.val());
+        config.orientation = parseInt(orientationSelect.val());
+        size = _this.sizes[config.size];
+        if (size) {
+          config.width = size.width;
+          config.height = size.height;
+          if (config.orientation === 1) {
+            return _ref4 = [config.height, config.width], config.width = _ref4[0], config.height = _ref4[1], _ref4;
+          }
+        }
+      };
+    };
+
+    DialogTemplateConfig.prototype.configure = function(tmpl, sheet, controller) {
+      var config, div, fn, _ref,
+        _this = this;
+      div = $(this.tmpl).appendTo(document.body);
+      div.find('.modal-header h3').text(this.title);
+      div.modal({
+        backdrop: 'static',
+        keyboard: false
+      });
+      div.find('.dialog-do-close').bind('click', function() {
+        return div.modal('hide').remove();
+      });
+      config = (_ref = sheet.config) != null ? _ref : {};
+      fn = this.createForm(div.find('.modal-body'), tmpl, config);
+      return div.find('.dialog-do-save').bind('click', function() {
+        fn();
+        sheet.config = config;
+        return _this.app.manager.save('sheets', sheet, function(err) {
+          if (err) return _this.app.showError(err);
+          controller.reloadSheets();
+          return div.modal('hide').remove();
+        });
+      });
+    };
+
+    return DialogTemplateConfig;
+
+  })(TemplateConfig);
+
+  ChronodexConfig = (function(_super) {
+
+    __extends(ChronodexConfig, _super);
+
+    function ChronodexConfig() {
+      ChronodexConfig.__super__.constructor.apply(this, arguments);
+    }
+
+    ChronodexConfig.prototype.title = 'Chronodex config';
+
+    ChronodexConfig.prototype.formTmpl = "<form class=\"form-horizontal\">\n  <div class=\"control-group\">\n    <label class=\"control-label\">Position:</label>\n    <div class=\"controls\">\n      <select class=\"align-select\">\n        <option value=\"l\">Left</option>\n        <option value=\"c\">Center</option>\n        <option value=\"r\">Right</option>\n      </select>\n      <select class=\"valign-select\">\n        <option value=\"t\">Top</option>\n        <option value=\"m\">Middle</option>\n        <option value=\"b\">Bottom</option>\n      </select>\n    </div>\n  </div>\n  <div class=\"control-group\">\n    <label class=\"control-label\">Zoom (%):</label>\n    <div class=\"controls\">\n      <input type=\"text\" class=\"zoom-text\"/>\n    </div>\n  </div>\n</form>";
+
+    ChronodexConfig.prototype.createForm = function(div, tmpl, config) {
+      var alignSelect, form, sizeFn, valignSelect, zoomText, _ref, _ref2, _ref3,
+        _this = this;
+      form = $(this.formTmpl).appendTo(div);
+      config.align = (_ref = config.align) != null ? _ref : 'c';
+      config.valign = (_ref2 = config.valign) != null ? _ref2 : 'm';
+      config.zoom = (_ref3 = config.zoom) != null ? _ref3 : 100;
+      alignSelect = form.find('.align-select').val(config.align);
+      valignSelect = form.find('.valign-select').val(config.valign);
+      zoomText = form.find('.zoom-text').val(config.zoom);
+      sizeFn = this.createSheetSizeForm(div, tmpl, config);
+      return function() {
+        var _ref4;
+        config.align = alignSelect.val();
+        config.valign = valignSelect.val();
+        config.zoom = (_ref4 = parseInt(zoomText.val())) != null ? _ref4 : 100;
+        sizeFn();
+        return config.draw = _this.generate(config);
+      };
+    };
+
+    ChronodexConfig.prototype.generate = function(config) {
+      var centerx, centery, circleRadius, deg, degStep, draw, height, heights, i, lineColor;
+      draw = [];
+      centerx = config.width / 2;
+      centery = config.height / 2;
+      circleRadius = 10;
+      degStep = 30;
+      heights = [15, 20, 25];
+      lineColor = '#000000';
+      draw.push({
+        type: 'circle',
+        color: lineColor,
+        x: centerx,
+        y: centery,
+        r: circleRadius
+      });
+      deg = 0;
+      for (i = 0; i < 12; i++) {
+        height = heights[i % heights.length];
+        draw.push({
+          type: 'arc',
+          color: lineColor,
+          x: centerx,
+          y: centery,
+          r: height,
+          sa: deg,
+          ea: deg + degStep
+        });
+        draw.push({
+          type: 'move',
+          x: centerx,
+          y: centery,
+          a: deg,
+          items: [
+            {
+              type: 'line',
+              x1: circleRadius,
+              y1: 0,
+              x2: height,
+              y2: 0,
+              color: lineColor
+            }
+          ]
+        });
+        deg += degStep;
+        draw.push({
+          type: 'move',
+          x: centerx,
+          y: centery,
+          a: deg,
+          items: [
+            {
+              type: 'line',
+              x1: circleRadius,
+              y1: 0,
+              x2: height,
+              y2: 0,
+              color: lineColor
+            }
+          ]
+        });
+      }
+      return draw;
+    };
+
+    return ChronodexConfig;
+
+  })(DialogTemplateConfig);
+
   GridTemplateConfig = (function(_super) {
 
     __extends(GridTemplateConfig, _super);
@@ -2431,7 +2634,8 @@
     };
 
     DrawTemplate.prototype.draw = function(data, canvas, zoom) {
-      var item, lineParams, params, textParams, _i, _len, _results;
+      var lineParams, processArray, textParams,
+        _this = this;
       lineParams = function(obj, params) {
         var _ref, _ref2;
         params.lineWidth = (_ref = obj != null ? obj.width : void 0) != null ? _ref : 1;
@@ -2462,23 +2666,47 @@
         }
         return params.font = '' + (Math.round(fontPixels * 100) / 100) + 'px Arial';
       };
-      _results = [];
-      for (_i = 0, _len = data.length; _i < _len; _i++) {
-        item = data[_i];
-        canvas.save();
-        params = {};
-        switch (item.type) {
-          case 'line':
-            lineParams(item, params);
-            canvas.beginPath().moveTo(item.x1 * zoom, item.y1 * zoom).lineTo(item.x2 * zoom, item.y2 * zoom).paint(params).endPath();
-            break;
-          case 'text':
-            textParams(item, params);
-            canvas.fillText(item.text, item.x * zoom, item.y * zoom, params);
+      processArray = function(data) {
+        var item, items, params, _i, _len, _ref, _results;
+        _results = [];
+        for (_i = 0, _len = data.length; _i < _len; _i++) {
+          item = data[_i];
+          canvas.save();
+          params = {};
+          switch (item.type) {
+            case 'circle':
+              lineParams(item, params);
+              canvas.beginPath().arc(item.x * zoom, item.y * zoom, item.r * zoom).stroke(params).endPath();
+              break;
+            case 'arc':
+              canvas.angleUnit = 'degrees';
+              lineParams(item, params);
+              canvas.beginPath().arc(item.x * zoom, item.y * zoom, item.r * zoom, item.sa, item.ea).stroke(params).endPath();
+              break;
+            case 'line':
+              lineParams(item, params);
+              canvas.beginPath().moveTo(item.x1 * zoom, item.y1 * zoom).lineTo(item.x2 * zoom, item.y2 * zoom).paint(params).endPath();
+              break;
+            case 'text':
+              textParams(item, params);
+              canvas.fillText(item.text, item.x * zoom, item.y * zoom, params);
+              break;
+            case 'move':
+              items = (_ref = item.items) != null ? _ref : [];
+              canvas.save();
+              if (item.x && item.y) canvas.translate(item.x * zoom, item.y * zoom);
+              if (item.a) {
+                canvas.angleUnit = 'degrees';
+                canvas.rotate(item.a);
+              }
+              processArray(items);
+              canvas.restore();
+          }
+          _results.push(canvas.restore());
         }
-        _results.push(canvas.restore());
-      }
-      return _results;
+        return _results;
+      };
+      return processArray(data);
     };
 
     return DrawTemplate;
