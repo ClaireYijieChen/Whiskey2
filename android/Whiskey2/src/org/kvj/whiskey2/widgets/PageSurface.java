@@ -3,6 +3,7 @@ package org.kvj.whiskey2.widgets;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.kvj.bravo7.SuperActivity;
@@ -11,6 +12,7 @@ import org.kvj.whiskey2.data.NoteInfo;
 import org.kvj.whiskey2.data.SheetInfo;
 import org.kvj.whiskey2.data.TemplateInfo;
 import org.kvj.whiskey2.data.template.DrawTemplate;
+import org.kvj.whiskey2.widgets.v11.PageDnDDecorator;
 
 import android.content.Context;
 import android.graphics.Canvas;
@@ -18,7 +20,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Paint.Style;
 import android.graphics.Path;
-import android.util.Log;
+import android.graphics.Rect;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -41,6 +43,7 @@ public class PageSurface extends View {
 	protected static final String TAG = "PageSurface";
 	private static final float LINK_WIDTH = 1.2f;
 	private static final float DOT_SIZE = 15;
+	private static final float SPOT_SIZE = 20;
 	private static final float DOT_GAP = 8;
 	public int marginLeft = 0;
 	public int marginTop = 0;
@@ -63,6 +66,37 @@ public class PageSurface extends View {
 	List<LinkInfo> links = new ArrayList<PageSurface.LinkInfo>();
 	private LayoutInflater inflater = null;
 	private Path linkPath = new Path();
+
+	public void createHotspots() throws JSONException {
+		if (null == sheetInfo.config) { // No spots
+			return;
+		}
+		JSONArray spots = sheetInfo.config.optJSONArray("spots");
+		if (null == spots) { // No spots
+			return;
+		}
+		ViewGroup parent = (ViewGroup) getParent();
+		for (int i = 0; i < spots.length(); i++) { // Create spots
+			View button = new View(getContext());
+			button.setFocusable(false);
+			RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams((int) (density * SPOT_SIZE),
+					(int) (density * SPOT_SIZE));
+			params.addRule(RelativeLayout.ALIGN_PARENT_TOP);
+			params.addRule(RelativeLayout.ALIGN_PARENT_LEFT);
+			JSONObject spot = spots.getJSONObject(i);
+			params.leftMargin = (int) (marginLeft + spot.optDouble("x", 0) / zoomFactor - density * SPOT_SIZE / 2);
+			params.topMargin = (int) (marginTop + spot.optDouble("y", 0) / zoomFactor - density * SPOT_SIZE / 2);
+			button.setBackgroundResource(R.drawable.spot_bg_dnd);
+			parent.addView(button, params);
+			decorateSpot(button, spot.optString("id", ""), parent);
+		}
+	}
+
+	private void decorateSpot(View button, String id, ViewGroup parent) {
+		if (android.os.Build.VERSION.SDK_INT >= 11) {
+			PageDnDDecorator.decorateSpot(this, button, id, parent);
+		}
+	}
 
 	public PageSurface(Context context) {
 		super(context);
@@ -112,6 +146,11 @@ public class PageSurface extends View {
 		return super.onTouchEvent(event);
 	}
 
+	private Rect getBounds(NoteInfo info) {
+		return new Rect(info.widget.getLeft() - marginLeft, info.widget.getTop() - marginTop, info.widget.getRight()
+				- marginLeft, info.widget.getBottom() - marginTop);
+	}
+
 	@Override
 	protected void onDraw(Canvas canvas) {
 		int width = getWidth();
@@ -137,12 +176,15 @@ public class PageSurface extends View {
 		}
 		if (needLinksData) { // Render links
 			try {
+				JSONArray spots = sheetInfo.config != null ? sheetInfo.config.optJSONArray("spots") : null;
 				for (NoteInfo note : notes) {
 					if (null == note.links || note.links.length() == 0) {
 						// No links
 						continue;
 					}
 					LinearLayout toolbar = createLinksToolbar(note);
+					Rect note1 = null;
+					Rect note2 = null;
 					for (int i = 0; i < note.links.length(); i++) {
 						// Every link
 						JSONObject link = note.links.getJSONObject(i);
@@ -151,14 +193,33 @@ public class PageSurface extends View {
 						int index = findInNotes(linkID);
 						if (index == -1) { // Not found
 							linkOK = false;
+							String spot = link.optString("spot", null);
+							if (null != spots && null != spot) {
+								// Search for spot
+								for (int j = 0; j < spots.length(); j++) {
+									// Search for spot
+									JSONObject spotObject = spots.getJSONObject(j);
+									if (spot.equals(spotObject.optString("id", null))) {
+										// Found spot
+										note1 = getBounds(note);
+										int x = (int) (spotObject.optDouble("x", 0) / zoomFactor);
+										int y = (int) (spotObject.optDouble("y", 0) / zoomFactor);
+										note2 = new Rect(x, y, x, y);
+										linkOK = true;
+									}
+								}
+							}
 						} else {
+							note1 = getBounds(note);
 							NoteInfo other = notes.get(index);
-							links.add(renderArrow(note, other,
+							note2 = getBounds(other);
+						}
+						if (linkOK) { // Have link
+							links.add(renderArrow(note1, note2,
 									getContext().getResources().getColor(R.color.note_link_color)));
 						}
-						createLinkButton(note, linkID, toolbar, linkOK);
+						createLinkButton(note, i, toolbar, linkOK);
 					}
-					Log.i(TAG, "Links found: " + links.size());
 				}
 			} catch (JSONException e) {
 				e.printStackTrace();
@@ -175,7 +236,7 @@ public class PageSurface extends View {
 		}
 	}
 
-	private void createLinkButton(final NoteInfo note, final long id, LinearLayout toolbar, boolean linkOK) {
+	private void createLinkButton(final NoteInfo note, final int index, LinearLayout toolbar, boolean linkOK) {
 		View button = new View(getContext());
 		button.setFocusable(false);
 		LinearLayout.LayoutParams params = new LinearLayout.LayoutParams((int) (density * DOT_SIZE),
@@ -187,7 +248,7 @@ public class PageSurface extends View {
 
 			@Override
 			public void onClick(View v) {
-				SuperActivity.notifyUser(getContext(), "Link: " + id);
+				SuperActivity.notifyUser(getContext(), "Link: " + index);
 			}
 		});
 		button.setOnLongClickListener(new OnLongClickListener() {
@@ -199,7 +260,7 @@ public class PageSurface extends View {
 
 							@Override
 							public void run() {
-								removeLink(note, id);
+								removeLink(note, index);
 							}
 						});
 				return true;
@@ -223,20 +284,11 @@ public class PageSurface extends View {
 		return toolbar;
 	}
 
-	private LinkInfo renderArrow(NoteInfo note1, NoteInfo note2, int color) {
-		float b1x = note1.widget.getLeft() - marginLeft;
-		float b2x = note2.widget.getLeft() - marginLeft;
-		float b1w = note1.widget.getWidth();
-		float b2w = note2.widget.getWidth();
-
-		float b1y = note1.widget.getTop() - marginTop;
-		float b2y = note2.widget.getTop() - marginTop;
-		float b1h = note1.widget.getHeight();
-		float b2h = note2.widget.getHeight();
-		float x1 = b1x + b1w / 2;
-		float x2 = b2x + b2w / 2;
-		float y1 = b1y + b1h / 2;
-		float y2 = b2y + b2h / 2;
+	private LinkInfo renderArrow(Rect note1, Rect note2, int color) {
+		float x1 = note1.exactCenterX();
+		float x2 = note2.exactCenterX();
+		float y1 = note1.exactCenterY();
+		float y2 = note2.exactCenterY();
 		boolean verticalTriangle = Math.abs(x2 - x1) > Math.abs(y2 - y1);
 		float triangleSize = 2;
 		LinkInfo info = new LinkInfo();
@@ -295,7 +347,11 @@ public class PageSurface extends View {
 		this.templateConfig = templateConfig;
 	}
 
-	public boolean removeLink(NoteInfo note, long linkID) {
+	public boolean removeLink(NoteInfo note, int index) {
+		return false;
+	}
+
+	public boolean createSpotLink(NoteInfo note, String id) {
 		return false;
 	}
 

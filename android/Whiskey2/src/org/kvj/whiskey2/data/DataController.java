@@ -531,7 +531,7 @@ public class DataController {
 		return false;
 	}
 
-	public boolean removeLink(NoteInfo note, long linkID) {
+	public boolean removeLink(NoteInfo note, int index) {
 		SyncService svc = getRemote();
 		if (null == svc) { // No connection
 			Log.w(TAG, "No service");
@@ -549,11 +549,13 @@ public class DataController {
 			}
 			boolean changed = false;
 			JSONArray newLinksArr = new JSONArray();
-			for (int i = 0; i < links.length(); i++) {
-				if (links.getJSONObject(i).optLong("id", -1) == linkID) {
-					changed = true;
-				} else {
-					newLinksArr.put(links.getJSONObject(i));
+			if (links.length() > index) { // Have to remove
+				for (int i = 0; i < links.length(); i++) {
+					if (i == index) {
+						changed = true;
+					} else {
+						newLinksArr.put(links.getJSONObject(i));
+					}
 				}
 			}
 			if (changed) { // Need update
@@ -715,6 +717,43 @@ public class DataController {
 			return true;
 		} catch (Exception e) {
 			e.printStackTrace();
+		}
+		return false;
+	}
+
+	public boolean createSpotLink(NoteInfo note, String id) {
+		SyncService svc = getRemote();
+		if (null == svc) { // No connection
+			Log.w(TAG, "No service");
+			return false;
+		}
+		try { // Remote and JSON errors
+			PJSONObject noteObj = findOne("notes", note.id);
+			if (null == noteObj) {
+				Log.e(TAG, "Note not found");
+				return false;
+			}
+			JSONArray links = noteObj.optJSONArray("links");
+			if (null == links) {
+				links = new JSONArray();
+				noteObj.put("links", links);
+			}
+			boolean needed = true;
+			for (int i = 0; i < links.length(); i++) {
+				if (links.getJSONObject(i).optString("spot", "").equals(id)) {
+					needed = false;
+					return false;
+				}
+			}
+			if (needed) { // Need update
+				JSONObject obj = new JSONObject();
+				obj.put("spot", id);
+				links.put(obj);
+				svc.update("notes", noteObj);
+			}
+			return true;
+		} catch (Exception e) {
+			Log.e(TAG, "Error creating link:", e);
 		}
 		return false;
 	}

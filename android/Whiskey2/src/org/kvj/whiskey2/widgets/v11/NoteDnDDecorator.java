@@ -3,6 +3,7 @@ package org.kvj.whiskey2.widgets.v11;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.json.JSONException;
 import org.kvj.whiskey2.R;
 import org.kvj.whiskey2.data.DataController;
 import org.kvj.whiskey2.data.NoteInfo;
@@ -97,6 +98,13 @@ public class NoteDnDDecorator {
 				dndinfo.notes.add(note);
 				dndinfo.leftFix = view.getWidth() / 2;
 				dndinfo.topFix = view.getHeight() / 2;
+				if (dndinfo.dragType == DragType.Link) { // Link
+					try {
+						surface.createHotspots();
+					} catch (JSONException e) {
+						e.printStackTrace();
+					}
+				}
 				view.startDrag(data, shadow, dndinfo, 0);
 				Log.i(TAG, "Note drag started");
 				return true;

@@ -325,6 +325,27 @@
     opacity: 1;
 }
 
+.note-spot {
+    width: 0;
+    height: 0;
+    opacity: 0.5;
+    border: 0.5em solid #5555ff;
+    border-radius: 0.5em;
+    z-index: 6;
+    position: absolute;
+    margin-left: -0.5em;
+    margin-top: -0.5em;
+}
+
+.note-spot-place {
+    position: absolute;
+    visibility: hidden;
+}
+
+.note-spot-hover {
+    opacity: 1;
+}
+
 .note-dot {
     width: 0;
     height: 0;

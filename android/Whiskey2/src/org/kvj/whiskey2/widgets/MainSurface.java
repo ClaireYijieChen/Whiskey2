@@ -126,8 +126,17 @@ public class MainSurface extends RelativeLayout {
 	private PageSurface createPage(int index, SheetInfo sheet, TemplateInfo template) {
 		final PageSurface page = new PageSurface(getContext()) {
 			@Override
-			public boolean removeLink(NoteInfo note, long linkID) {
-				if (adapter.getController().removeLink(note, linkID)) {
+			public boolean removeLink(NoteInfo note, int index) {
+				if (adapter.getController().removeLink(note, index)) {
+					adapter.getController().notifyNoteChanged(note, false);
+					return true;
+				}
+				return false;
+			}
+
+			@Override
+			public boolean createSpotLink(NoteInfo note, String id) {
+				if (adapter.getController().createSpotLink(note, id)) {
 					adapter.getController().notifyNoteChanged(note, false);
 					return true;
 				}

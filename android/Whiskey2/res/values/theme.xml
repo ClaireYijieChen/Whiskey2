@@ -21,7 +21,6 @@
 	<dimen name="note_br_focused_size">2dp</dimen>
 	<color name="float_toolbar_bg">#ff888888</color>
 	<color name="dnd_target_bg_color">#80555555</color>
-					    
 	<color name="link_bg_ok">#ff00aa00</color>    
 	<color name="link_bg_ng">#ffff0000</color>
 	<color name="notepad_default_color">#ff552222</color>
@@ -30,4 +29,7 @@
 	<color name="note_drop_target">#88dddddd</color>
 	<color name="note_link_color">#ffffaaaa</color>
 	<color name="note_merge_target_color">#ffaaaaff</color>
+	<color name="spot_bg_color">#ff5555ff</color>
+	<color name="spot_bg_color_dnd">#805555ff</color>
+	<color name="spot_bg_color_hidden">#005555ff</color>
 </resources>

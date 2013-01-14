@@ -748,6 +748,23 @@ class Notepad
   preciseEm: (value) ->
     return Math.floor(value*100/@zoomFactor)/100
 
+  createSpotLink: (id, spot) ->
+    @app.manager.findOne 'notes', id, (err, note) =>
+      if err then return @app.showError err
+      links = note.links
+      if not links
+        note.links = []
+        links = note.links
+      index = @app.findByID links, spot.id, 'spot'
+      if index isnt -1
+        log 'Spot already created'
+        return
+      links.push(spot: spot.id)
+      @app.manager.save 'notes', note, (err) =>
+        if err then return @app.showError err
+        @reloadSheets()
+    return yes
+
   createNoteLink: (note, noteID) ->
     if note.id is noteID
       log 'Same note'
@@ -775,10 +792,31 @@ class Notepad
     return yes
 
   loadNotes: (sheet, parent, canvas, zoom) ->
-    renderArrow = (div1, div2, color) =>
+    createSpots = (note) =>
+      spots = sheet.config?.spots ? []
+      links = note.links ? []
+      for spot in spots
+        spotDiv = $(document.createElement('div')).addClass('note-spot').appendTo(parent)
+        x = @preciseEm spot.x
+        y = @preciseEm spot.y
+        spotDiv.css left: "#{x}em", top: "#{y}em"
+        do (spot, spotDiv) =>
+          spotDiv.bind 'dragover', (e) =>
+            if @app.dragHasType e, 'custom/note'
+              spotDiv.addClass('note-spot-hover')
+              e.preventDefault()
+          spotDiv.bind 'drop', (e) =>
+            noteData = @app.dragGetType e, 'custom/note'
+            if noteData?.id and noteData?.link
+              if @createSpotLink noteData.id, spot
+                e.stopPropagation()
+                return no
+          spotDiv.bind 'dragleave', (e) =>
+            spotDiv.removeClass('note-spot-hover')
+          spotDiv.bind 'dragend', (e) =>
+            spotDiv.remove()
+    renderArrow = (box1, box2, color) =>
       triangleSize = 2*zoom
-      box1 = x: div1.position().left, y: div1.position().top, w: div1.outerWidth(), h: div1.outerHeight()
-      box2 = x: div2.position().left, y: div2.position().top, w: div2.outerWidth(), h: div2.outerHeight()
       x1 = box1.x+box1.w/2
       x2 = box2.x+box2.w/2
       y1 = box1.y+box1.h/2
@@ -800,6 +838,13 @@ class Notepad
 
     renderLinks = (notes) =>
       dotsRadius = 2
+      spots = sheet.config?.spots ? []
+      for spot in spots
+        spotDiv = $(document.createElement('div')).addClass('note-spot-place').appendTo(parent)
+        spotDiv.attr(id: "spot#{sheet.id}#{spot.id}")
+        x = @preciseEm(spot.x)
+        y = @preciseEm(spot.y)
+        spotDiv.css(left: "#{x}em", top: "#{y}em")
       for note in notes
         links = note.links ? []
         if links.length is 0 then continue
@@ -808,6 +853,10 @@ class Notepad
         y = @preciseEm note.y
         radius = @preciseEm dotsRadius
         dotsDiv.css left: "#{x}em", top: "#{y}em"
+        spots = sheet.config?.spots ? []
+        div2box = (div) =>
+          return x: div.position().left, y: div.position().top, w: div.outerWidth(), h: div.outerHeight()
+        box1 = div2box($('#note'+note.id))
         for i in [0...links.length]
           link = links[i]
           index = @app.findByID notes, link.id
@@ -815,12 +864,20 @@ class Notepad
           other = null
           if index is -1
             createLink = no
+            if link.spot
+              spotIndex = @app.findByID spots, link.spot
+              if spotIndex isnt -1
+                spot = spots[spotIndex]
+                createLink = yes
+                box2 = div2box($("#spot#{sheet.id}#{spot.id}"))
           else
             other = notes[index]
             if other.sheet_id isnt note.sheet_id
               createLink = no
+            else
+              box2 = div2box($('#note'+other.id))
           if createLink
-            renderArrow $('#note'+note.id), $('#note'+other.id), '#ffaaaa', 6
+            renderArrow box1, box2, '#ffaaaa', 6
           dotDiv = $(document.createElement('div')).addClass('note-dot').appendTo(dotsDiv)
           dotDiv.css 'border-width': "#{radius}em", 'border-radius': "#{radius}em"
           dotDiv.css 'border-color': (if createLink then '#008800' else '#ff0000')
@@ -849,7 +906,6 @@ class Notepad
           @app.manager.save 'notes', n, (err) =>
             if err then return @app.showError err
             @reloadSheets()
-
       div = $(document.createElement('div')).addClass('note').appendTo(parent)
       div.attr draggable: yes, id: 'note'+note.id
       div.bind 'click', (e) =>
@@ -871,6 +927,8 @@ class Notepad
             ids.push id
           @app.dragSetType e, 'custom/note', {ids: ids, x: offset.left, y: offset.top, append: e.shiftKey}
         else
+          if e.ctrlKey
+            createSpots(note)
           @app.dragSetType e, 'custom/note', {id: note.id, x: offset.left, y: offset.top, link: e.ctrlKey, append: e.shiftKey}
       div.bind 'dragover', (e) =>
         if (@app.dragHasType e, 'custom/note') or (@app.dragHasType e, 'Files')
@@ -1325,6 +1383,9 @@ class TemplateConfig
   constructor: (@app) ->
 
   configure: (tmpl, sheet, controller) ->
+    
+  preciseCoord: (value) ->
+    return Math.round(value*10)/10
 
 class DialogTemplateConfig extends TemplateConfig
   title: 'Sheet config'
@@ -1455,18 +1516,65 @@ class ChronodexConfig extends DialogTemplateConfig
     centerx = config.width / 2
     centery = config.height / 2
     circleRadius = 10
+    smallCRadius = 2
+    smallRadius = 15
+    middleRadius = 20
+    bigRadius = 25
     degStep = 30
-    heights = [15, 20, 25]
+    heights = [smallRadius, middleRadius, bigRadius]
+    spotHeights = [bigRadius, middleRadius, bigRadius]
     lineColor = '#000000'
-    draw.push(type: 'circle', color: lineColor, x: centerx, y: centery, r: circleRadius)
+    lineGrayColor = '#aaaaaa'
+    littleRadius = 6
+    config.spots = []
+    times = [
+      {x: 0, y: littleRadius-1, t: '6am'}
+      {x: -3, y: littleRadius-4, t: '7am'}
+      {x: -littleRadius+1, y: -1, t: '8am'}
+      {x: -smallRadius-6, y: -1, t: '9am'}
+      {x: -middleRadius-6, y: -smallRadius+4, t: '10am'}
+      {x: -middleRadius, y: -bigRadius+2, t: '11am'}
+      {x: 0, y: -bigRadius-3, t: '12am'}
+      {x: smallRadius-3, y: -middleRadius+2, t: '1pm'}
+      {x: middleRadius+2, y: -smallRadius, t: '2pm'}
+      {x: bigRadius+3, y: 0, t: '3pm'}
+      {x: middleRadius-1, y: smallRadius-2, t: '4pm'}
+      {x: smallRadius-2, y: bigRadius, t: '5pm'}
+      {x: 0, y: bigRadius+5, t: '6pm'}
+      {x: -smallRadius, y: middleRadius, t: '7pm'}
+      {x: -bigRadius, y: smallRadius, t: '8pm'}
+      {x: -bigRadius-8, y: 0, t: '9pm'}
+    ]
+    draw.push(type: 'circle', color: lineColor, x: bigRadius, y: 0, r: smallCRadius)
+    draw.push(type: 'circle', color: lineColor, x: 0, y: bigRadius, r: smallCRadius)
+    draw.push(type: 'circle', color: lineColor, x: -bigRadius, y: 0, r: smallCRadius)
+    draw.push(type: 'circle', color: lineColor, x: 0, y: -bigRadius, r: smallCRadius)
+    draw.push(type: 'circle', color: lineColor, x: 0, y: 0, r: circleRadius)
+    draw.push(type: 'arc', color: lineGrayColor, x: 0, y: 0, r: littleRadius, sa: 90, ea: 180)
+    pi180 = Math.PI/180
+    zoom = config.zoom / 100
+    xyWithAngle = (deg, radius) =>
+      [@preciseCoord(centerx+Math.round(Math.cos(deg*pi180)*radius*zoom)), @preciseCoord(centery+Math.round(Math.sin(deg*pi180)*radius*zoom))]
+    deg = 90
+    for i in [0...4]
+      itm = type: 'move', a: deg, items: [{type: 'line', x1: littleRadius, y1: 0, x2: circleRadius, y2: 0, color: lineGrayColor}]
+      draw.push(itm)
+      [x, y] = xyWithAngle(deg, circleRadius)
+      config.spots.push(id: 'h'+(6+i), x: x, y: y)
+      deg += degStep
     deg = 0
     for i in [0...12]
       height = heights[i % heights.length]
-      draw.push(type: 'arc', color: lineColor, x: centerx, y: centery, r: height, sa: deg, ea: deg+degStep)
-      draw.push(type: 'move', x: centerx, y: centery, a: deg, items: [{type: 'line', x1: circleRadius, y1: 0, x2: height, y2: 0, color: lineColor}])
+      [x, y] = xyWithAngle(deg, spotHeights[i % spotHeights.length])
+      config.spots.push(id: 'h'+(if i>7 then i+2 else i+15), x: x, y: y)
+      draw.push(type: 'arc', color: lineColor, x: 0, y: 0, r: height, sa: deg, ea: deg+degStep)
+      draw.push(type: 'move', a: deg, items: [{type: 'line', x1: circleRadius, y1: 0, x2: height, y2: 0, color: lineColor}])
+      draw.push(itm)
       deg += degStep
-      draw.push(type: 'move', x: centerx, y: centery, a: deg, items: [{type: 'line', x1: circleRadius, y1: 0, x2: height, y2: 0, color: lineColor}])
-    return draw
+      draw.push(type: 'move', a: deg, items: [{type: 'line', x1: circleRadius, y1: 0, x2: height, y2: 0, color: lineColor}])
+    for i, time of times
+      draw.push(type: 'text', text: time.t, x: time.x ? 0, y: time.y ? 0, size: -3)
+    return [{type: 'move', x: centerx, y: centery, items: draw, z: config.zoom}]
 
 class GridTemplateConfig extends TemplateConfig
 
@@ -1729,6 +1837,8 @@ class DrawTemplate
       fontSize = obj?.size ? 0
       fontPixels = 0
       switch fontSize
+        when -4 then fontPixels = zoom*2.0
+        when -3 then fontPixels = zoom*2.7
         when -2 then fontPixels = zoom*3.5
         when -1 then fontPixels = zoom*4.5
         when 0 then fontPixels = zoom*5.5
@@ -1761,6 +1871,8 @@ class DrawTemplate
             if item.a
               canvas.angleUnit = 'degrees'
               canvas.rotate(item.a)
+            if item.z
+              canvas.scale(item.z/100, item.z/100)
             processArray(items)
             canvas.restore()
         canvas.restore()
