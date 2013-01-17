@@ -51,7 +51,7 @@
       }
       for (key in sheetPlugins) {
         cls = sheetPlugins[key];
-        this.sheetPlugins[key] = new cls(this);
+        this.sheetPlugins[key] = new cls(this, key);
       }
       return this.manager.open(function(error) {
         if (error) {
@@ -1539,8 +1539,8 @@
               expwidth = _this.preciseEm(iconsizeexpanded);
               expheight = _this.preciseEm(img.height() / mul);
               mul = Math.max(img.width(), img.height()) / ICON_SIZE;
-              iconwidth = _this.preciseEm(img.width() / mul);
-              iconheight = _this.preciseEm(img.height() / mul);
+              iconwidth = iconsize;
+              iconheight = iconwidth;
               div.bind('mouseover', function() {
                 attDiv.css({
                   width: "" + expwidth + "em",
@@ -1674,7 +1674,7 @@
     Notepad.prototype.stick = true;
 
     Notepad.prototype.loadSheet = function(index, div) {
-      var bounds, canvas, clearSelector, configButton, divContent, divTitle, height, inRectangle, key, notesInRectangle, offsetToCoordinates, plugins, sheet, sheetHeight, sheetWidth, stickToGrid, template, templateConfig, width, zoom, _i, _j, _len, _len2, _ref, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7,
+      var bounds, canvas, clearSelector, conf, configButton, divContent, divTitle, height, inRectangle, key, notesInRectangle, offsetToCoordinates, plugins, sheet, sheetHeight, sheetWidth, stickToGrid, template, templateConfig, width, zoom, _i, _j, _len, _len2, _ref, _ref2, _ref3, _ref4, _ref5, _ref6,
         _this = this;
       clearSelector = function() {
         if (_this.selectorDiv) {
@@ -1953,8 +1953,12 @@
       this.app.templateDrawer.render(template, sheet, canvas, zoom, bounds);
       for (_j = 0, _len2 = plugins.length; _j < _len2; _j++) {
         key = plugins[_j];
-        if (this.app.sheetPlugins[key] && ((_ref7 = sheet.config) != null ? _ref7["draw" + key] : void 0)) {
-          this.app.templateDrawer.draw(sheet.config["draw" + key], canvas, zoom, bounds);
+        if (this.app.sheetPlugins[key]) {
+          conf = this.app.sheetPlugins[key].getConfig(sheet.config);
+          log('Draw:', sheet.config, conf, key);
+          if (conf != null ? conf.draw : void 0) {
+            this.app.templateDrawer.draw(conf.draw, canvas, zoom, bounds);
+          }
         }
       }
       this.loadNotes(sheet, divContent, canvas, zoom);
@@ -2184,11 +2188,22 @@
 
   SheetPlugin = (function() {
 
-    function SheetPlugin(app) {
+    function SheetPlugin(app, key) {
       this.app = app;
+      this.key = key;
     }
 
     SheetPlugin.prototype.load = function(div, sheet, controller) {};
+
+    SheetPlugin.prototype.getConfig = function(config) {
+      var conf, _ref;
+      conf = (_ref = config != null ? config["_" + this.key] : void 0) != null ? _ref : {};
+      return conf;
+    };
+
+    SheetPlugin.prototype.setConfig = function(config, conf) {
+      return config["_" + this.key] = conf;
+    };
 
     SheetPlugin.prototype.addButton = function(div, cls, handler) {
       var a, i, parent,

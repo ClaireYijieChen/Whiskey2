@@ -32,7 +32,7 @@ class Whiskey2
     for key, cls of templateConfigs
       @templateConfigs[key] = new cls this
     for key, cls of sheetPlugins
-      @sheetPlugins[key] = new cls this
+      @sheetPlugins[key] = new cls(this, key)
     #@templateConfigs.week = new WeekTemplateConfig this
     #@templateConfigs.grid = new GridTemplateConfig this
     #@templateConfigs.chronodex = new ChronodexConfig this
@@ -1001,8 +1001,9 @@ class Notepad
             expwidth = @preciseEm iconsizeexpanded
             expheight = @preciseEm(img.height() / mul)
             mul = Math.max(img.width(), img.height()) / ICON_SIZE
-            iconwidth = @preciseEm(img.width()/mul)
-            iconheight = @preciseEm(img.height()/mul)
+            iconwidth = iconsize
+            # iconheight = @preciseEm(img.height()/mul)
+            iconheight = iconwidth
             div.bind 'mouseover', () =>
               attDiv.css width: "#{expwidth}em", height: "#{expheight}em"
               attDiv.addClass 'note-file-image-hover'
@@ -1269,7 +1270,10 @@ class Notepad
     bounds = {width: sheetWidth, height: sheetHeight}
     @app.templateDrawer.render template, sheet, canvas, zoom, bounds
     for key in plugins
-      if @app.sheetPlugins[key] and sheet.config?["draw#{key}"] then @app.templateDrawer.draw(sheet.config["draw#{key}"], canvas, zoom, bounds)
+      if @app.sheetPlugins[key]
+        conf = @app.sheetPlugins[key].getConfig(sheet.config)
+        log 'Draw:', sheet.config, conf, key
+        if conf?.draw then @app.templateDrawer.draw(conf.draw, canvas, zoom, bounds)
     @loadNotes sheet, divContent, canvas, zoom
     return template
 
@@ -1407,9 +1411,16 @@ class TemplateConfig
 
 class SheetPlugin
 
-  constructor: (@app) ->
+  constructor: (@app, @key) ->
 
   load: (div, sheet, controller) ->
+
+  getConfig: (config) ->
+    conf = config?["_#{@key}"] ? {}
+    return conf
+
+  setConfig: (config, conf) ->
+    config["_#{@key}"] = conf
 
   addButton: (div, cls, handler) ->
     parent = div.find('.sheet-toolbar-custom')

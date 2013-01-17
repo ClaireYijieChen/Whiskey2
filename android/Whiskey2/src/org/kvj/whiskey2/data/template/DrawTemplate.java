@@ -1,5 +1,7 @@
 package org.kvj.whiskey2.data.template;
 
+import java.util.Iterator;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -52,13 +54,34 @@ public class DrawTemplate {
 			arr = tmpl.config.optJSONArray("draw");
 		}
 		if (null != arr) { // Have data to draw
-			draw(arr, canvas, page.getZoomFactor());
+			draw(arr, canvas, page.getZoomFactor(), sheet.getWidth(tmpl), sheet.getHeight(tmpl));
+		}
+		if (null != sheet.config) { // Sheet plugins
+			@SuppressWarnings("unchecked")
+			Iterator<String> keys = sheet.config.keys();
+			while (keys.hasNext()) {
+				String key = keys.next();
+				if (key.startsWith("_")) { // Plugin command
+					JSONObject conf = sheet.config.getJSONObject(key);
+					if (conf.has("draw")) { // Smth. to draw
+						arr = conf.getJSONArray("draw");
+						draw(arr, canvas, page.getZoomFactor(), sheet.getWidth(tmpl), sheet.getHeight(tmpl));
+					}
+				}
+			}
 		}
 	}
 
 	private void setLineParameters(JSONObject obj, Paint paint, Canvas canvas) {
-		paint.setColor(Color.parseColor(obj.optString("color", "#000000")));
-		paint.setStrokeWidth(density * obj.optInt("width", 1));
+		if (obj.has("color")) { //
+			paint.setColor(Color.parseColor(obj.optString("color", "#000000")));
+			paint.setStrokeWidth(density * obj.optInt("width", 1));
+			paint.setStyle(Paint.Style.STROKE);
+		}
+		if (obj.has("fill")) { // Fill
+			paint.setColor(Color.parseColor(obj.optString("fill", "#000000")));
+			paint.setStyle(Paint.Style.FILL);
+		}
 	}
 
 	private void setTextParameters(JSONObject obj, Paint paint, Canvas canvas, float zoom) {
@@ -88,29 +111,42 @@ public class DrawTemplate {
 		paint.setTextSize(fontPixel / zoom);
 	}
 
-	public void draw(JSONArray data, Canvas canvas, float zoom) throws JSONException {
+	private double coord(JSONObject obj, String name, int size) throws JSONException {
+		double value = obj.optDouble(name, 0);
+		if (value < 0 && size > 0) { // Revert
+			value = size + value;
+		}
+		return value;
+	}
+
+	public void draw(JSONArray data, Canvas canvas, float zoom, int width, int height) throws JSONException {
 		for (int i = 0; i < data.length(); i++) { // Draw items
 			JSONObject obj = data.getJSONObject(i);
 			String type = obj.optString("type", "");
 			if ("text".equals(type)) { // Draw text
 				setTextParameters(obj, textPaint, canvas, zoom);
-				canvas.drawText(obj.optString("text", ""), (float) obj.optDouble("x", 0) / zoom,
-						(float) obj.optDouble("y", 0) / zoom, textPaint);
+				canvas.drawText(obj.optString("text", ""), (float) coord(obj, "x", width) / zoom,
+						(float) coord(obj, "y", height) / zoom, textPaint);
 			}
 			if ("line".equals(type)) { // Draw line
 				setLineParameters(obj, linePaint, canvas);
-				canvas.drawLine((float) obj.optDouble("x1", 0) / zoom, (float) obj.optDouble("y1", 0) / zoom,
-						(float) obj.optDouble("x2", 0) / zoom, (float) obj.optDouble("y2", 0) / zoom, linePaint);
+				canvas.drawLine((float) coord(obj, "x1", width) / zoom, (float) coord(obj, "y1", height) / zoom,
+						(float) coord(obj, "x2", width) / zoom, (float) coord(obj, "y2", height) / zoom, linePaint);
+			}
+			if ("rect".equals(type)) { // Draw line
+				setLineParameters(obj, linePaint, canvas);
+				canvas.drawRect((float) coord(obj, "x1", width) / zoom, (float) coord(obj, "y1", height) / zoom,
+						(float) coord(obj, "x2", width) / zoom, (float) coord(obj, "y2", height) / zoom, linePaint);
 			}
 			if ("circle".equals(type)) { // Draw circle
 				setLineParameters(obj, linePaint, canvas);
-				canvas.drawCircle((float) obj.optDouble("x", 0) / zoom, (float) obj.optDouble("y", 0) / zoom,
+				canvas.drawCircle((float) coord(obj, "x", width) / zoom, (float) coord(obj, "y", height) / zoom,
 						(float) obj.optDouble("r", 0) / zoom, linePaint);
 			}
 			if ("arc".equals(type)) { // Draw arc
 				setLineParameters(obj, linePaint, canvas);
-				float x = (float) obj.optDouble("x", 0) / zoom;
-				float y = (float) obj.optDouble("y", 0) / zoom;
+				float x = (float) coord(obj, "x", width) / zoom;
+				float y = (float) coord(obj, "y", height) / zoom;
 				float r = (float) obj.optDouble("r", 0) / zoom;
 				RectF rect = new RectF(x - r, y - r, x + r, y + r);
 				float a = (float) obj.optDouble("sa", 0);
@@ -121,8 +157,8 @@ public class DrawTemplate {
 				if (null != items && items.length() > 0) { // Have items
 					canvas.save();
 					if (obj.has("x") && obj.has("y")) { // Translate
-						float x = (float) obj.optDouble("x", 0) / zoom;
-						float y = (float) obj.optDouble("y", 0) / zoom;
+						float x = (float) coord(obj, "x", width) / zoom;
+						float y = (float) coord(obj, "y", height) / zoom;
 						canvas.translate(x, y);
 					}
 					if (obj.has("a")) { // Rotate
@@ -132,7 +168,7 @@ public class DrawTemplate {
 						float scale = (float) obj.optDouble("z", 0) / 100;
 						canvas.scale(scale, scale);
 					}
-					draw(items, canvas, zoom);
+					draw(items, canvas, zoom, -1, -1);
 					canvas.restore();
 				}
 			}

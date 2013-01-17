@@ -507,7 +507,20 @@ class DrawTemplate
         canvas.restore()
     processArray(data)
 
-class ScoreConfigDialog extends DialogTemplateConfig
+class SheetPluginConfigDialog extends DialogTemplateConfig
+
+  constructor: (@app, @plugin) ->
+
+  createForm: (div, tmpl, config) ->
+    conf = @plugin.getConfig(config)
+    fn = @createPluginForm(div, conf, config)
+    return () =>
+      fn()
+      @plugin.setConfig(config, conf)
+
+  createPluginForm: (div, conf, config) ->
+
+class ScoreConfigDialog extends SheetPluginConfigDialog
 
   formTmpl: """
   <div style=\"text-align: center;\">
@@ -521,7 +534,7 @@ class ScoreConfigDialog extends DialogTemplateConfig
   zeroColor: '#000000'
 
   title: 'Enter Score:'
-  createForm: (div, tmpl, config) ->
+  createPluginForm: (div, config) ->
     form = $(@formTmpl).appendTo(div)
     scoreUp = config.scoreUp ? 0
     scoreDown = config.scoreDown ? 0
@@ -546,7 +559,7 @@ class ScoreConfigDialog extends DialogTemplateConfig
         config.scoreUp = scoreUp+score
       else
         config.scoreDown = scoreDown+score
-      config.drawscore = @generate(config)
+      config.draw = @generate(config)
 
   sizes: [{min: 125, radius: 5}, {min: 25, radius: 4}, {min: 5, radius: 3}, {min: 1, radius: 2}]
   gap: 2
@@ -555,7 +568,7 @@ class ScoreConfigDialog extends DialogTemplateConfig
 
   generate: (config) ->
     draw = []
-    score = config.scoreUp + config.scoreDown
+    score = (config.scoreUp ? 0) + (config.scoreDown ? 0)
     color = if score>0 then @upColor else @downColor
     score = Math.abs(score)
     index = 0
@@ -572,8 +585,8 @@ class ScoreConfigDialog extends DialogTemplateConfig
 
 class ScoreSheetPlugin extends SheetPlugin
 
-  constructor: (@app) ->
-    @dialog = new ScoreConfigDialog(@app)
+  constructor: (@app, @key) ->
+    @dialog = new ScoreConfigDialog(@app, this)
 
   load: (div, sheet, controller) ->
     @addButton div, 'icon-signal', =>

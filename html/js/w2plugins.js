@@ -1,5 +1,5 @@
 (function() {
-  var ChronodexConfig, DialogTemplateConfig, DrawTemplate, GridTemplateConfig, ScoreConfigDialog, ScoreSheetPlugin, WeekTemplateConfig,
+  var ChronodexConfig, DialogTemplateConfig, DrawTemplate, GridTemplateConfig, ScoreConfigDialog, ScoreSheetPlugin, SheetPluginConfigDialog, WeekTemplateConfig,
     __hasProp = Object.prototype.hasOwnProperty,
     __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor; child.__super__ = parent.prototype; return child; };
 
@@ -857,6 +857,32 @@
 
   })();
 
+  SheetPluginConfigDialog = (function(_super) {
+
+    __extends(SheetPluginConfigDialog, _super);
+
+    function SheetPluginConfigDialog(app, plugin) {
+      this.app = app;
+      this.plugin = plugin;
+    }
+
+    SheetPluginConfigDialog.prototype.createForm = function(div, tmpl, config) {
+      var conf, fn,
+        _this = this;
+      conf = this.plugin.getConfig(config);
+      fn = this.createPluginForm(div, conf, config);
+      return function() {
+        fn();
+        return _this.plugin.setConfig(config, conf);
+      };
+    };
+
+    SheetPluginConfigDialog.prototype.createPluginForm = function(div, conf, config) {};
+
+    return SheetPluginConfigDialog;
+
+  })(DialogTemplateConfig);
+
   ScoreConfigDialog = (function(_super) {
 
     __extends(ScoreConfigDialog, _super);
@@ -875,7 +901,7 @@
 
     ScoreConfigDialog.prototype.title = 'Enter Score:';
 
-    ScoreConfigDialog.prototype.createForm = function(div, tmpl, config) {
+    ScoreConfigDialog.prototype.createPluginForm = function(div, config) {
       var form, score, scoreDown, scoreUp, updateScore, _ref, _ref2,
         _this = this;
       form = $(this.formTmpl).appendTo(div);
@@ -914,7 +940,7 @@
         } else {
           config.scoreDown = scoreDown + score;
         }
-        return config.drawscore = _this.generate(config);
+        return config.draw = _this.generate(config);
       };
     };
 
@@ -941,9 +967,9 @@
     ScoreConfigDialog.prototype.marginLeft = 4;
 
     ScoreConfigDialog.prototype.generate = function(config) {
-      var boxes, color, draw, i, index, score, size, x;
+      var boxes, color, draw, i, index, score, size, x, _ref, _ref2;
       draw = [];
-      score = config.scoreUp + config.scoreDown;
+      score = ((_ref = config.scoreUp) != null ? _ref : 0) + ((_ref2 = config.scoreDown) != null ? _ref2 : 0);
       color = score > 0 ? this.upColor : this.downColor;
       score = Math.abs(score);
       index = 0;
@@ -971,15 +997,16 @@
 
     return ScoreConfigDialog;
 
-  })(DialogTemplateConfig);
+  })(SheetPluginConfigDialog);
 
   ScoreSheetPlugin = (function(_super) {
 
     __extends(ScoreSheetPlugin, _super);
 
-    function ScoreSheetPlugin(app) {
+    function ScoreSheetPlugin(app, key) {
       this.app = app;
-      this.dialog = new ScoreConfigDialog(this.app);
+      this.key = key;
+      this.dialog = new ScoreConfigDialog(this.app, this);
     }
 
     ScoreSheetPlugin.prototype.load = function(div, sheet, controller) {
